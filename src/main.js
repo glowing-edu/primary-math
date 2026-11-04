@@ -605,15 +605,28 @@ window.GameProgress = {
 
 window.PrimaryMathApp = { boot }
 
+// True when the click started inside `id`. We must use the dispatch-time
+// composedPath: the toggle handlers re-render these roots, which detaches the
+// clicked button before the event bubbles here, so `target.closest()` would
+// wrongly report an outside click and immediately close the dropdown.
+function clickStartedIn(event, id) {
+  if (typeof event.composedPath === 'function') {
+    const path = event.composedPath()
+    if (path.length > 0) {
+      return path.some((node) => node instanceof Element && node.id === id)
+    }
+  }
+  const target = event.target
+  return target instanceof Element && !!target.closest(`#${id}`)
+}
+
 // Close open dropdowns when tapping/clicking elsewhere on the page.
 document.addEventListener('click', (event) => {
-  const target = event.target
-  if (!(target instanceof Element)) return
-  if (profileMenuOpen && !target.closest('#profile-root')) {
+  if (profileMenuOpen && !clickStartedIn(event, 'profile-root')) {
     profileMenuOpen = false
     renderProfileUI()
   }
-  if (cloudOpen && !target.closest('#cloud-sync-root')) {
+  if (cloudOpen && !clickStartedIn(event, 'cloud-sync-root')) {
     cloudOpen = false
     renderCloudUI()
   }
