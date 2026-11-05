@@ -99,22 +99,39 @@
                     <div id="profile-root"></div>
                 </div>
             </div>
-
-            <!-- Stage Badges Nav -->
-            <div class="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1" id="stage-nav">
-                <!-- Dynamic stage buttons will be injected here -->
-            </div>
         </div>
     </header>
 
     <!-- Main Game Container -->
     <main class="max-w-4xl w-full mx-auto flex-1 bg-white rounded-3xl shadow-xl border-4 border-sky-100 p-4 md:p-8 flex flex-col justify-between relative overflow-hidden">
-        
+
+        <!-- Level Selection Screen -->
+        <section id="level-screen" class="flex-1 min-h-0 overflow-y-auto flex flex-col justify-center">
+            <div class="text-center mb-5">
+                <h2 class="text-2xl md:text-3xl font-black text-sky-600">揀一個關卡</h2>
+                <p class="text-sm text-slate-500 font-bold mt-1">Choose a level</p>
+                <div class="inline-flex items-center gap-2 bg-amber-50 px-4 py-1.5 rounded-full border border-amber-200 mt-3">
+                    <i class="fa-solid fa-star text-amber-400"></i>
+                    <span id="level-score-count" class="font-black text-amber-600">0</span>
+                </div>
+            </div>
+            <div id="level-grid" class="flex flex-col gap-5">
+                <!-- Level cards injected by the game engine -->
+            </div>
+        </section>
+
+        <!-- Game Screen -->
+        <section id="game-screen" class="hidden flex-1 flex flex-col justify-between">
+
         <!-- Stage Title Banner -->
-        <div class="flex justify-between items-center border-b-2 border-slate-100 pb-3 mb-4">
-            <div class="flex items-center gap-2">
-                <span id="stage-number-badge" class="bg-sky-500 text-white font-black px-3 py-1 rounded-full text-sm">階段 1</span>
-                <h2 id="stage-title" class="text-lg md:text-xl font-bold text-slate-700">10的組成與分解</h2>
+        <div class="flex justify-between items-center gap-2 border-b-2 border-slate-100 pb-3 mb-4">
+            <div class="flex items-center gap-2 min-w-0">
+                <button onclick="showLevelSelect()" aria-label="返回關卡選單 Back to levels"
+                    class="bounce-btn shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs px-3 py-2 rounded-full flex items-center gap-1 transition">
+                    <i class="fa-solid fa-arrow-left"></i><span class="hidden sm:inline">關卡</span>
+                </button>
+                <span id="stage-number-badge" class="bg-sky-500 text-white font-black px-3 py-1 rounded-full text-sm shrink-0">階段 1</span>
+                <h2 id="stage-title" class="text-lg md:text-xl font-bold text-slate-700 truncate">10的組成與分解</h2>
             </div>
             <!-- Stars score display -->
             <div class="flex items-center gap-2 bg-amber-50 px-4 py-1.5 rounded-full border border-amber-200">
@@ -172,6 +189,8 @@
             </div>
         </div>
 
+        </section>
+
     </main>
 
     <!-- Footer Feedback & Credits -->
@@ -224,12 +243,22 @@
     <!-- Game Engine & Cantonese Speech Logic -->
     <script>
         // --- STAGE DEFINITIONS ---
+        // Display order follows this array; `id` stays stable so saved progress
+        // from earlier versions keeps pointing at the same skill.
+        // New beginner levels use ids 6-12 so old progress (ids 1-5) is untouched.
         const STAGES = [
-            { id: 1, name: "10的組成與分解", desc: "湊十好朋友", badge: "階段 1" },
-            { id: 2, name: "合十法（湊十法）", desc: "加法進位心算", badge: "階段 2" },
-            { id: 3, name: "破十法", desc: "減法破十心算", badge: "階段 3" },
-            { id: 4, name: "平十法", desc: "減法連續減到10", badge: "階段 4" },
-            { id: 5, name: "借十法", desc: "直式退位減法筆算", badge: "階段 5" }
+            { id: 6, name: "數一數 1-5", desc: "實物點數與數量對應", group: "basics" },
+            { id: 7, name: "5以內分與合", desc: "數的分解與組成", group: "basics" },
+            { id: 8, name: "5以內加減法", desc: "情境加減概念", group: "basics" },
+            { id: 9, name: "認數與點數", desc: "6-10 的數量對應", group: "basics" },
+            { id: 10, name: "10以內分與合", desc: "10以內的分解與組成", group: "basics" },
+            { id: 11, name: "10以內加法", desc: "10以內的加法概念", group: "basics" },
+            { id: 12, name: "10以內減法", desc: "10以內的減法概念", group: "basics" },
+            { id: 1, name: "10的組成與分解", desc: "湊十好朋友", group: "advanced" },
+            { id: 2, name: "合十法（湊十法）", desc: "加法進位心算", group: "advanced" },
+            { id: 3, name: "破十法", desc: "減法破十心算", group: "advanced" },
+            { id: 4, name: "平十法", desc: "減法連續減到10", group: "advanced" },
+            { id: 5, name: "借十法", desc: "直式退位減法筆算", group: "advanced" }
         ];
 
         let currentStage = 1;
@@ -237,6 +266,7 @@
         let score = 0;
         let currentHintSpeechText = "";
         let answerLocked = false;
+        let savedProgress = null;
 
         // --- SAVED PROGRESS BRIDGE (multi-profile + Puter sync) ---
         function getGameScore() {
@@ -247,17 +277,29 @@
         // Restore a profile's progress into the running game.
         function applySavedProgress(saved) {
             const p = saved || {};
+            savedProgress = p;
             score = Math.max(0, Number(p.score) || 0);
             currentStage = Math.min(STAGES.length, Math.max(1, Number(p.lastStage) || 1));
             answerLocked = false;
             const scoreEl = document.getElementById('score-count');
             if (scoreEl) scoreEl.innerText = score;
-            if (document.getElementById('stage-nav')) {
-                renderStageNav();
-                loadQuestion();
-            }
+            updateStageHeader();
+            showLevelSelect();
         }
         window.applySavedProgress = applySavedProgress;
+
+        // Keep the level cards in sync while playing (main.js owns persistence).
+        function updateLocalProgress(correct) {
+            if (!savedProgress) return;
+            const stageId = String(currentStage);
+            const stages = savedProgress.stages || (savedProgress.stages = {});
+            const stat = stages[stageId] || (stages[stageId] = { correct: 0, attempts: 0 });
+            stat.attempts += 1;
+            if (correct) stat.correct += 1;
+            savedProgress.score = Math.max(Number(savedProgress.score) || 0, score);
+            savedProgress.lastStage = currentStage;
+            savedProgress.updatedAt = Date.now();
+        }
 
         // --- WEB SPEECH API (CANTONESE) ---
         let cantoneseVoice = null;
@@ -305,31 +347,125 @@
             if (window.PrimaryMathApp && typeof window.PrimaryMathApp.boot === 'function') {
                 window.PrimaryMathApp.boot();
             } else {
-                renderStageNav();
-                loadQuestion();
+                updateStageHeader();
+                showLevelSelect();
             }
         };
 
-        function renderStageNav() {
-            const nav = document.getElementById('stage-nav');
-            nav.innerHTML = STAGES.map(s => `
-                <button onclick="changeStage(${s.id})" class="px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition bounce-btn flex items-center gap-1 ${currentStage === s.id ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
-                    <span>${s.id}. ${s.name}</span>
-                </button>
-            `).join('');
+        const LEVEL_STYLES = [
+            { bg: 'bg-amber-400', ring: 'border-amber-200 hover:border-amber-400', icon: 'fa-hashtag' },
+            { bg: 'bg-sky-500', ring: 'border-sky-200 hover:border-sky-400', icon: 'fa-sitemap' },
+            { bg: 'bg-emerald-500', ring: 'border-emerald-200 hover:border-emerald-400', icon: 'fa-plus' },
+            { bg: 'bg-violet-500', ring: 'border-violet-200 hover:border-violet-400', icon: 'fa-hashtag' },
+            { bg: 'bg-sky-500', ring: 'border-sky-200 hover:border-sky-400', icon: 'fa-sitemap' },
+            { bg: 'bg-emerald-500', ring: 'border-emerald-200 hover:border-emerald-400', icon: 'fa-plus' },
+            { bg: 'bg-rose-500', ring: 'border-rose-200 hover:border-rose-400', icon: 'fa-minus' },
+            { bg: 'bg-violet-500', ring: 'border-violet-200 hover:border-violet-400', icon: 'fa-shapes' },
+            { bg: 'bg-emerald-500', ring: 'border-emerald-200 hover:border-emerald-400', icon: 'fa-plus' },
+            { bg: 'bg-amber-500', ring: 'border-amber-200 hover:border-amber-400', icon: 'fa-minus' },
+            { bg: 'bg-violet-500', ring: 'border-violet-200 hover:border-violet-400', icon: 'fa-arrow-right' },
+            { bg: 'bg-rose-500', ring: 'border-rose-200 hover:border-rose-400', icon: 'fa-calculator' }
+        ];
 
-            document.getElementById('stage-number-badge').innerText = `階段 ${currentStage}`;
-            document.getElementById('stage-title').innerText = STAGES[currentStage - 1].name;
+        const LEVEL_GROUPS = [
+            { key: 'basics', title: '基礎 · 10以內', subtitle: '數量、分合與加減概念' },
+            { key: 'advanced', title: '進階 · 20以內心算', subtitle: '湊十、破十、平十、借十' }
+        ];
+
+        function stageOrder(stageId) {
+            return STAGES.findIndex((s) => s.id === stageId) + 1;
         }
 
-        function changeStage(stageId) {
+        function renderLevelSelect() {
+            const grid = document.getElementById('level-grid');
+            if (!grid) return;
+
+            const levelScore = document.getElementById('level-score-count');
+            if (levelScore) levelScore.innerText = score;
+
+            const hasPlayed = Boolean(savedProgress && (Number(savedProgress.attempts) > 0 || Number(savedProgress.updatedAt) > 0));
+
+            grid.innerHTML = LEVEL_GROUPS.map((group) => {
+                const cards = STAGES
+                    .map((s, i) => ({ s, i }))
+                    .filter(({ s }) => s.group === group.key)
+                    .map(({ s, i }) => {
+                        const style = LEVEL_STYLES[i % LEVEL_STYLES.length];
+                        const stat = savedProgress && savedProgress.stages ? savedProgress.stages[String(s.id)] : null;
+                        const correct = Math.max(0, Number(stat && stat.correct) || 0);
+                        const attempts = Math.max(0, Number(stat && stat.attempts) || 0);
+                        const progressText = attempts > 0
+                            ? `答對 ${correct} / ${attempts} 題`
+                            : '未開始 Not started';
+                        const isCurrent = hasPlayed && s.id === currentStage;
+
+                        return `
+                            <button type="button" onclick="startStage(${s.id})"
+                                class="bounce-btn text-left bg-white rounded-2xl border-2 ${style.ring} shadow-md p-4 flex items-start gap-3 hover:shadow-lg transition ${isCurrent ? 'ring-2 ring-offset-2 ring-sky-300' : ''}">
+                                <span class="w-12 h-12 shrink-0 rounded-2xl ${style.bg} text-white flex items-center justify-center text-xl shadow-md">
+                                    <i class="fa-solid ${style.icon}"></i>
+                                </span>
+                                <span class="flex-1 min-w-0">
+                                    <span class="flex items-center gap-2">
+                                        <span class="text-[11px] font-black text-slate-400">階段 ${i + 1}</span>
+                                        ${isCurrent ? '<span class="text-[10px] font-black text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full">上次玩到</span>' : ''}
+                                    </span>
+                                    <span class="block font-black text-slate-700 mt-0.5">${s.name}</span>
+                                    <span class="block text-xs text-slate-500 font-bold">${s.desc}</span>
+                                    <span class="block text-[11px] font-bold mt-1.5 ${attempts > 0 ? 'text-emerald-600' : 'text-slate-400'}">${progressText}</span>
+                                </span>
+                                <span class="self-center text-slate-300 text-lg" aria-hidden="true">▶</span>
+                            </button>
+                        `;
+                    })
+                    .join('');
+
+                if (!cards) return '';
+                return `
+                    <section>
+                        <div class="flex flex-wrap items-baseline justify-between gap-1 mb-2">
+                            <h3 class="font-black text-slate-700">${group.title}</h3>
+                            <p class="text-[11px] font-bold text-slate-400">${group.subtitle}</p>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">${cards}</div>
+                    </section>
+                `;
+            }).join('');
+        }
+
+        function updateStageHeader() {
+            const badge = document.getElementById('stage-number-badge');
+            const title = document.getElementById('stage-title');
+            const stage = STAGES.find((s) => s.id === currentStage) || STAGES[0];
+            if (badge) badge.innerText = `階段 ${stageOrder(stage.id)}`;
+            if (title) title.innerText = stage.name;
+        }
+
+        function showLevelSelect() {
+            const levels = document.getElementById('level-screen');
+            const game = document.getElementById('game-screen');
+            if (!levels || !game) return;
+            levels.classList.remove('hidden');
+            game.classList.add('hidden');
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            renderLevelSelect();
+        }
+
+        function startStage(stageId) {
+            const id = Math.min(STAGES.length, Math.max(1, Number(stageId) || 1));
             playSound('click');
-            currentStage = stageId;
+            currentStage = id;
             hideHint();
-            renderStageNav();
+            updateStageHeader();
+            const levels = document.getElementById('level-screen');
+            const game = document.getElementById('game-screen');
+            if (levels) levels.classList.add('hidden');
+            if (game) game.classList.remove('hidden');
             loadQuestion();
             if (window.GameProgress) {
-                window.GameProgress.setStage(stageId);
+                window.GameProgress.setStage(id);
             }
         }
 
@@ -356,6 +492,27 @@
                     break;
                 case 5:
                     generateStage5(formulaBox, visualArea, optionsBox);
+                    break;
+                case 6:
+                    generateStage6(formulaBox, visualArea, optionsBox);
+                    break;
+                case 7:
+                    generateStage7(formulaBox, visualArea, optionsBox);
+                    break;
+                case 8:
+                    generateStage8(formulaBox, visualArea, optionsBox);
+                    break;
+                case 9:
+                    generateStage9(formulaBox, visualArea, optionsBox);
+                    break;
+                case 10:
+                    generateStage10(formulaBox, visualArea, optionsBox);
+                    break;
+                case 11:
+                    generateStage11(formulaBox, visualArea, optionsBox);
+                    break;
+                case 12:
+                    generateStage12(formulaBox, visualArea, optionsBox);
                     break;
             }
         }
@@ -677,7 +834,267 @@
                 </div>
             `;
 
-            renderMultipleChoiceOptions(ans, 10, 40, optionsBox);
+            renderMultipleChoiceOptions(ans, 1, 40, optionsBox);
+        }
+
+        // --- BEGINNER STAGES (ids 6-9): NUMBERS UP TO 10 ---
+
+        function randomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(items) {
+            return items[Math.floor(Math.random() * items.length)];
+        }
+
+        const COUNT_THEMES = [
+            { emoji: '🍎', name: '蘋果' },
+            { emoji: '🍊', name: '橙' },
+            { emoji: '🍓', name: '士多啤梨' },
+            { emoji: '🐤', name: '小雞' },
+            { emoji: '🎈', name: '氣球' },
+            { emoji: '⭐', name: '星星' },
+            { emoji: '🍪', name: '餅乾' },
+            { emoji: '🐟', name: '小魚' }
+        ];
+
+        const ADD_CONTEXTS = [
+            { emoji: '🍎', text: (a, b) => `盤子裡有 ${a} 個蘋果，媽媽又放了 ${b} 個，現在總共有幾個？` },
+            { emoji: '🎈', text: (a, b) => `有 ${a} 個氣球，再吹多 ${b} 個，一共有幾個？` },
+            { emoji: '🍪', text: (a, b) => `盒裡有 ${a} 塊餅乾，再放 ${b} 塊，總共有幾塊？` }
+        ];
+
+        const SUB_CONTEXTS = [
+            { emoji: '🐤', text: (t, r) => `樹上有 ${t} 隻小鳥，飛走了 ${r} 隻，還剩幾隻？` },
+            { emoji: '🍎', text: (t, r) => `盤裡有 ${t} 個蘋果，吃掉 ${r} 個，還剩幾個？` },
+            { emoji: '🎈', text: (t, r) => `有 ${t} 個氣球，飛走 ${r} 個，還剩幾個？` }
+        ];
+
+        // Counting (點數) with a changing arrangement so children see that the
+        // total stays the same however the objects are laid out.
+        function buildCountingQuestion(n, minVal, maxVal, formulaBox, visualArea, optionsBox) {
+            const theme = pickRandom(COUNT_THEMES);
+            const scattered = Math.random() < 0.5;
+            currentQuestion = { ans: n, kind: 'count' };
+
+            formulaBox.innerHTML = `
+                <span class="text-3xl md:text-4xl">🔢</span>
+                <span class="text-xl md:text-2xl font-black text-slate-600">數一數，有幾個？</span>
+            `;
+
+            const items = Array.from({ length: n }, (_, i) => {
+                const tilt = scattered ? randomInt(-18, 18) : 0;
+                const lift = scattered ? randomInt(-8, 8) : 0;
+                return `<span class="text-4xl md:text-5xl leading-none dot-pop" style="transform: rotate(${tilt}deg) translateY(${lift}px)">${theme.emoji}</span>`;
+            }).join('');
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center gap-3">
+                    <p class="text-xs font-bold text-slate-500 text-center">用手指指着，逐個數一數</p>
+                    <div class="flex flex-wrap items-center justify-center gap-3 md:gap-4 max-w-lg">${items}</div>
+                </div>
+            `;
+
+            currentHintSpeechText = `我哋一齊用手指指住數：${Array.from({ length: n }, (_, i) => i + 1).join('、')}。數到 ${n}，所以一共有 ${n} 個${theme.name}。`;
+            document.getElementById('hint-content').innerHTML = `
+                <div class="text-center space-y-2">
+                    <p class="text-sm">逐個點數：</p>
+                    <div class="flex flex-wrap justify-center gap-1">
+                        ${Array.from({ length: n }, (_, i) => `<span class="bg-sky-100 text-sky-700 px-2.5 py-1 rounded-full text-sm font-black">${i + 1}</span>`).join('')}
+                    </div>
+                    <p class="text-sm font-black text-sky-700">總共有 ${n} 個</p>
+                </div>
+            `;
+
+            renderMultipleChoiceOptions(n, minVal, maxVal, optionsBox);
+        }
+
+        // Part-part-whole (分與合) on a 5/10 frame.
+        function buildBondQuestion(total, maxTotal, formulaBox, visualArea, optionsBox) {
+            const part = randomInt(1, total - 1);
+            const other = total - part;
+            currentQuestion = { ans: other, kind: 'bond', total, part };
+
+            formulaBox.innerHTML = `
+                <span class="text-amber-500 font-extrabold">${total}</span>
+                <span class="text-slate-400">=</span>
+                <span class="text-sky-600">${part}</span>
+                <span class="text-sky-500">+</span>
+                <span class="inline-block border-b-4 border-dashed border-amber-400 w-14 text-center text-amber-500">?</span>
+            `;
+
+            const cells = Array.from({ length: total }, (_, i) => {
+                if (i < part) {
+                    return `<div class="w-9 h-9 md:w-11 md:h-11 bg-sky-400 rounded-full flex items-center justify-center text-white dot-pop"><i class="fa-solid fa-circle"></i></div>`;
+                }
+                return `<div class="w-9 h-9 md:w-11 md:h-11 bg-amber-50 border-2 border-dashed border-amber-300 rounded-full flex items-center justify-center text-amber-400 font-black">?</div>`;
+            }).join('');
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center gap-2">
+                    <p class="text-xs font-bold text-slate-500 text-center">${total} 個分成兩份：藍色 ${part} 個，黃色仲有幾多個？</p>
+                    <div class="grid grid-cols-5 gap-1.5 bg-white border-4 border-slate-300 rounded-2xl p-2 shadow-md">${cells}</div>
+                </div>
+            `;
+
+            currentHintSpeechText = `${total} 可以分成 ${part} 同 ${other}。我哋試下：${part} 個藍色加埋 ${other} 個黃色，合起來就係 ${total} 個。`;
+            document.getElementById('hint-content').innerHTML = `
+                <div class="text-center space-y-2">
+                    <p class="text-sm">${total} 可以分成：</p>
+                    <div class="flex justify-center items-center gap-3 text-lg font-black">
+                        <span class="bg-sky-100 text-sky-700 px-3 py-1 rounded-xl">${part}</span>
+                        <span>同</span>
+                        <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-xl animate-pulse">${other}</span>
+                    </div>
+                    <p class="text-xs text-slate-600">合起來：${part} + ${other} = <strong>${total}</strong></p>
+                </div>
+            `;
+
+            renderMultipleChoiceOptions(other, 1, maxTotal, optionsBox);
+        }
+
+        // Contextual addition (合起來 / 加上去).
+        function buildAdditionQuestion(a, b, limit, formulaBox, visualArea, optionsBox) {
+            const ans = a + b;
+            const ctx = pickRandom(ADD_CONTEXTS);
+            currentQuestion = { ans, kind: 'add', a, b };
+
+            formulaBox.innerHTML = `
+                <span>${a}</span>
+                <span class="text-emerald-500">+</span>
+                <span>${b}</span>
+                <span class="text-slate-400">=</span>
+                <span class="inline-block border-b-4 border-dashed border-emerald-400 w-14 text-center text-emerald-600">?</span>
+            `;
+
+            const group = (count) => `
+                <div class="flex flex-wrap items-center justify-center gap-2 max-w-[9rem]">
+                    ${Array.from({ length: count }, () => `<span class="text-3xl md:text-4xl leading-none dot-pop">${ctx.emoji}</span>`).join('')}
+                </div>
+            `;
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center gap-3">
+                    <p class="text-xs font-bold text-slate-500 text-center max-w-md">${ctx.text(a, b)}</p>
+                    <div class="flex items-center justify-center gap-4">
+                        ${group(a)}
+                        <span class="text-2xl font-black text-emerald-500">+</span>
+                        ${group(b)}
+                    </div>
+                </div>
+            `;
+
+            const countOn = Array.from({ length: b }, (_, i) => a + i + 1).join('、');
+            currentHintSpeechText = `呢度有 ${a} 個，再加多 ${b} 個。我哋由 ${a} 開始數多 ${b} 個：${countOn}，一共係 ${ans} 個。`;
+            document.getElementById('hint-content').innerHTML = `
+                <div class="text-center space-y-2">
+                    <p class="text-sm">兩堆合起來：</p>
+                    <div class="flex justify-center items-center gap-3 text-lg font-black">
+                        <span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-xl">${a}</span>
+                        <span>+</span>
+                        <span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-xl">${b}</span>
+                        <span>=</span>
+                        <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-xl animate-pulse">${ans}</span>
+                    </div>
+                    <p class="text-xs text-slate-600">一齊由 1 數到 ${ans}，就知一共有 ${ans} 個。</p>
+                </div>
+            `;
+
+            renderMultipleChoiceOptions(ans, 1, limit, optionsBox);
+        }
+
+        // Contextual subtraction (拿走 / 剩下).
+        function buildSubtractionQuestion(total, removed, limit, formulaBox, visualArea, optionsBox) {
+            const ans = total - removed;
+            const ctx = pickRandom(SUB_CONTEXTS);
+            currentQuestion = { ans, kind: 'sub', total, removed };
+
+            formulaBox.innerHTML = `
+                <span>${total}</span>
+                <span class="text-rose-500">-</span>
+                <span>${removed}</span>
+                <span class="text-slate-400">=</span>
+                <span class="inline-block border-b-4 border-dashed border-rose-400 w-14 text-center text-rose-600">?</span>
+            `;
+
+            const items = Array.from({ length: total }, (_, i) => {
+                if (i < removed) {
+                    return `<span class="relative text-3xl md:text-4xl leading-none opacity-30 grayscale">${ctx.emoji}<span class="absolute inset-0 flex items-center justify-center text-rose-500 text-2xl font-black">✕</span></span>`;
+                }
+                return `<span class="text-3xl md:text-4xl leading-none dot-pop">${ctx.emoji}</span>`;
+            }).join('');
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center gap-3">
+                    <p class="text-xs font-bold text-slate-500 text-center max-w-md">${ctx.text(total, removed)}</p>
+                    <div class="flex flex-wrap items-center justify-center gap-2 max-w-lg">${items}</div>
+                </div>
+            `;
+
+            currentHintSpeechText = `原本有 ${total} 個，拿走 ${removed} 個，剩返 ${ans} 個。我哋由 ${total} 開始倒數 ${removed} 個，最後剩返 ${ans} 個。`;
+            document.getElementById('hint-content').innerHTML = `
+                <div class="text-center space-y-2">
+                    <p class="text-sm">由 ${total} 拿走 ${removed}：</p>
+                    <div class="flex justify-center items-center gap-3 text-lg font-black">
+                        <span class="bg-rose-100 text-rose-700 px-3 py-1 rounded-xl">${total}</span>
+                        <span>-</span>
+                        <span class="bg-rose-100 text-rose-700 px-3 py-1 rounded-xl">${removed}</span>
+                        <span>=</span>
+                        <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-xl animate-pulse">${ans}</span>
+                    </div>
+                    <p class="text-xs text-slate-600">打咗交叉嘅就係拿走咗嘅 ${removed} 個。</p>
+                </div>
+            `;
+
+            renderMultipleChoiceOptions(ans, 0, limit, optionsBox);
+        }
+
+        // Stage 6: count real objects 1-5.
+        function generateStage6(formulaBox, visualArea, optionsBox) {
+            buildCountingQuestion(randomInt(1, 5), 1, 5, formulaBox, visualArea, optionsBox);
+        }
+
+        // Stage 7: number bonds within 5.
+        function generateStage7(formulaBox, visualArea, optionsBox) {
+            buildBondQuestion(randomInt(2, 5), 5, formulaBox, visualArea, optionsBox);
+        }
+
+        // Stage 8: addition/subtraction within 5, with story contexts.
+        function generateStage8(formulaBox, visualArea, optionsBox) {
+            if (Math.random() < 0.5) {
+                const a = randomInt(1, 4);
+                const b = randomInt(1, 5 - a);
+                buildAdditionQuestion(a, b, 5, formulaBox, visualArea, optionsBox);
+            } else {
+                const total = randomInt(2, 5);
+                const removed = randomInt(1, total - 1);
+                buildSubtractionQuestion(total, removed, 5, formulaBox, visualArea, optionsBox);
+            }
+        }
+
+        // Stage 9: recognise and count quantities 6-10.
+        function generateStage9(formulaBox, visualArea, optionsBox) {
+            buildCountingQuestion(randomInt(6, 10), 6, 10, formulaBox, visualArea, optionsBox);
+        }
+
+        // Stage 10: number bonds within 10 (includes the key bond of 10).
+        function generateStage10(formulaBox, visualArea, optionsBox) {
+            buildBondQuestion(randomInt(6, 10), 10, formulaBox, visualArea, optionsBox);
+        }
+
+        // Stage 11: addition with sums from 6 to 10.
+        function generateStage11(formulaBox, visualArea, optionsBox) {
+            const ans = randomInt(6, 10);
+            const a = randomInt(1, ans - 1);
+            const b = ans - a;
+            buildAdditionQuestion(a, b, 10, formulaBox, visualArea, optionsBox);
+        }
+
+        // Stage 12: subtraction from totals 6 to 10.
+        function generateStage12(formulaBox, visualArea, optionsBox) {
+            const total = randomInt(6, 10);
+            const removed = randomInt(1, total - 1);
+            buildSubtractionQuestion(total, removed, 10, formulaBox, visualArea, optionsBox);
         }
 
         // --- HELPER: RENDER MULTIPLE CHOICE BUTTONS ---
@@ -685,12 +1102,22 @@
             let options = new Set();
             options.add(correctAns);
 
-            while (options.size < 4) {
+            // Prefer distractors close to the answer, but bail out after a while:
+            // when the answer sits outside [minVal, maxVal] there may be very few
+            // valid nearby values, and an unbounded loop would freeze the page.
+            let guard = 0;
+            while (options.size < 4 && guard < 60) {
+                guard += 1;
                 let offset = (Math.floor(Math.random() * 5) + 1) * (Math.random() < 0.5 ? 1 : -1);
                 let dummy = correctAns + offset;
                 if (dummy >= minVal && dummy <= maxVal && dummy !== correctAns) {
                     options.add(dummy);
                 }
+            }
+
+            // Fallback: fill any remaining slots from the whole allowed range.
+            for (let v = minVal; v <= maxVal && options.size < 4; v += 1) {
+                options.add(v);
             }
 
             const sortedOptions = Array.from(options).sort((a, b) => a - b);
@@ -709,12 +1136,13 @@
 
             if (selected === currentQuestion.ans) {
                 playSound('correct');
-                score += 10;
+                score += 1;
                 document.getElementById('score-count').innerText = score;
 
                 if (window.GameProgress) {
                     window.GameProgress.record(currentStage, true);
                 }
+                updateLocalProgress(true);
 
                 // Confetti animation
                 confetti({
@@ -736,6 +1164,7 @@
                 if (window.GameProgress) {
                     window.GameProgress.record(currentStage, false);
                 }
+                updateLocalProgress(false);
                 btnEl.classList.remove('bg-sky-500', 'border-sky-700');
                 btnEl.classList.add('bg-rose-500', 'border-rose-700', 'animate-shake');
 
