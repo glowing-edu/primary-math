@@ -25,6 +25,7 @@ import {
 } from './lib/puterSync.js'
 
 const AUTO_SYNC_DELAY_MS = 2500
+const AUTO_SYNC_DAY_KEY = 'primary-math-auto-sync-day'
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const $ = (id) => document.getElementById(id)
 
@@ -39,6 +40,8 @@ let cloudOpen = false
 let cloud = null
 let cloudLoading = false
 let syncing = false
+let autoSyncing = false
+let autoSyncDayCache = null
 let note = null
 let lastSync = null
 let auth = isPuterAvailable() ? 'checking' : 'unavailable'
@@ -67,6 +70,33 @@ function formatTime(ts) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+// Automatic syncing is limited to one successful run per calendar day.
+// Manual sync buttons bypass this entirely.
+function todayKey(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function autoSyncedToday() {
+  if (autoSyncDayCache === todayKey()) return true
+  try {
+    return localStorage.getItem(AUTO_SYNC_DAY_KEY) === todayKey()
+  } catch {
+    return false
+  }
+}
+
+function markAutoSyncedToday() {
+  autoSyncDayCache = todayKey()
+  try {
+    localStorage.setItem(AUTO_SYNC_DAY_KEY, autoSyncDayCache)
+  } catch {
+    // ignore
+  }
 }
 
 function applyGameProgress() {
@@ -425,6 +455,7 @@ function renderCloudPanel(panel) {
     </div>
 
     ${lastSync ? `<p class="text-[11px] text-slate-500 mt-2">上次同步 ${formatTime(lastSync)}</p>` : ''}
+    ${autoSyncedToday() ? '<p class="text-[11px] text-emerald-600 mt-1">今日已自動同步 Auto-synced today</p>' : ''}
     ${note ? `<p class="text-[11px] mt-1 ${note === '已是最新狀態 Up to date' ? 'text-emerald-600' : 'text-rose-600'}">${escapeHtml(note)}</p>` : ''}
 
     <button type="button" data-cloud-action="upload" ${syncing ? 'disabled' : ''}
@@ -440,8 +471,8 @@ function renderCloudPanel(panel) {
       登出 Sign Out
     </button>
     <p class="mt-3 text-[10px] text-slate-400 leading-relaxed">
-      上載只會合併，唔會刪除雲端嘅小朋友。遊戲進度會自動同步。<br />
-      Uploads only merge; no cloud profile is ever removed automatically.
+      上載只會合併，唔會刪除雲端嘅小朋友。進度每日自動同步一次，亦可隨時手動同步。<br />
+      Uploads only merge; no cloud profile is ever removed automatically. Progress syncs automatically once a day; manual sync is always available.
     </p>
   `
 }
@@ -560,11 +591,29 @@ async function runSync({ push = true, silent = false, force = true, applyChanges
   }
 }
 
+// Automatic sync runs at most once per calendar day. Successful manual syncs
+// do not consume the daily slot, so progress can still be uploaded later.
+async function runAutoSync({ applyChanges = false } = {}) {
+  if (!isPuterAvailable() || auth !== 'signedIn') return null
+  if (autoSyncing || autoSyncedToday()) return null
+
+  autoSyncing = true
+  try {
+    const result = await runSync({ push: true, silent: true, force: false, applyChanges })
+    if (result) markAutoSyncedToday()
+    return result
+  } finally {
+    autoSyncing = false
+  }
+}
+
 function scheduleAutoSync() {
   if (!isPuterAvailable() || auth !== 'signedIn') return
+  if (autoSyncedToday()) return
+
   clearTimeout(syncTimer)
   syncTimer = setTimeout(() => {
-    runSync({ push: true, silent: true, force: false, applyChanges: false })
+    runAutoSync({ applyChanges: false })
   }, AUTO_SYNC_DELAY_MS)
 }
 
@@ -580,7 +629,7 @@ async function boot() {
   const signed = await checkAuth()
   renderCloudUI()
   if (signed) {
-    await runSync({ push: false, silent: true, force: false, applyChanges: true })
+    await runAutoSync({ applyChanges: true })
   }
 }
 
