@@ -249,7 +249,7 @@
         // --- STAGE DEFINITIONS ---
         // Display order follows this array; `id` stays stable so saved progress
         // from earlier versions keeps pointing at the same skill.
-        // New beginner levels use ids 6-12 so old progress (ids 1-5) is untouched.
+        // New levels use ids 6-13 so old progress (ids 1-5) is untouched.
         const STAGES = [
             { id: 6, name: "數一數 1-5", desc: "實物點數與數量對應", group: "basics" },
             { id: 7, name: "5以內分與合", desc: "數的分解與組成", group: "basics" },
@@ -259,8 +259,11 @@
             { id: 11, name: "10以內加法", desc: "10以內的加法概念", group: "basics" },
             { id: 12, name: "10以內減法", desc: "10以內的減法概念", group: "basics" },
             { id: 1, name: "10的組成與分解", desc: "湊十好朋友", group: "advanced" },
+            { id: 13, name: "湊十法準備", desc: "三步拆數湊十（預備）", group: "advanced" },
             { id: 2, name: "合十法（湊十法）", desc: "加法進位心算", group: "advanced" },
+            { id: 14, name: "破十法準備", desc: "三步拆數破十（預備）", group: "advanced" },
             { id: 3, name: "破十法", desc: "減法破十心算", group: "advanced" },
+            { id: 15, name: "平十法準備", desc: "兩步拆數連減（預備）", group: "advanced" },
             { id: 4, name: "平十法", desc: "減法連續減到10", group: "advanced" },
             { id: 5, name: "借十法", desc: "直式退位減法筆算", group: "advanced" }
         ];
@@ -367,8 +370,11 @@
             { bg: 'bg-emerald-500', ring: 'border-emerald-200 hover:border-emerald-400', icon: 'fa-plus' },
             { bg: 'bg-rose-500', ring: 'border-rose-200 hover:border-rose-400', icon: 'fa-minus' },
             { bg: 'bg-violet-500', ring: 'border-violet-200 hover:border-violet-400', icon: 'fa-shapes' },
+            { bg: 'bg-cyan-500', ring: 'border-cyan-200 hover:border-cyan-400', icon: 'fa-sitemap' },
             { bg: 'bg-emerald-500', ring: 'border-emerald-200 hover:border-emerald-400', icon: 'fa-plus' },
+            { bg: 'bg-rose-500', ring: 'border-rose-200 hover:border-rose-400', icon: 'fa-arrow-down' },
             { bg: 'bg-amber-500', ring: 'border-amber-200 hover:border-amber-400', icon: 'fa-minus' },
+            { bg: 'bg-cyan-500', ring: 'border-cyan-200 hover:border-cyan-400', icon: 'fa-arrow-down' },
             { bg: 'bg-violet-500', ring: 'border-violet-200 hover:border-violet-400', icon: 'fa-arrow-right' },
             { bg: 'bg-rose-500', ring: 'border-rose-200 hover:border-rose-400', icon: 'fa-calculator' }
         ];
@@ -522,6 +528,15 @@
                     break;
                 case 12:
                     generateStage12(formulaBox, visualArea, optionsBox);
+                    break;
+                case 13:
+                    generateStage13(formulaBox, visualArea, optionsBox);
+                    break;
+                case 14:
+                    generateStage14(formulaBox, visualArea, optionsBox);
+                    break;
+                case 15:
+                    generateStage15(formulaBox, visualArea, optionsBox);
                     break;
             }
         }
@@ -1106,6 +1121,737 @@
             buildSubtractionQuestion(total, removed, 10, formulaBox, visualArea, optionsBox);
         }
 
+        // Stage 13: guided make-ten preparation.
+        // One question has three picks, e.g. 8 + 5:
+        //   1) 8 needs 2 to make 10
+        //   2) 5 splits into 2 and 3
+        //   3) 8 + 2 + 3 = 13
+        function generateStage13(formulaBox, visualArea, optionsBox) {
+            const num1 = randomInt(6, 9); // larger addend
+            const splitNeeded = 10 - num1;
+            const minNum2 = Math.max(4, splitNeeded + 1);
+            const num2 = randomInt(minNum2, num1 - 1); // keep num1 as the larger number
+            const remain = num2 - splitNeeded;
+
+            currentQuestion = {
+                kind: 'makeTenPrep',
+                step: 1,
+                num1,
+                num2,
+                splitNeeded,
+                remain,
+                total: num1 + num2,
+                ans: splitNeeded
+            };
+
+            renderMakeTenPrepStep(1);
+        }
+
+        function renderMakeTenPrepStep(step) {
+            const q = currentQuestion;
+            if (!q || q.kind !== 'makeTenPrep') return;
+
+            const optionsBox = document.getElementById('answer-options');
+            if (!optionsBox) return;
+
+            q.step = step;
+            answerLocked = false;
+            hideHint();
+
+            let prompt = '';
+
+            if (step === 1) {
+                q.ans = q.splitNeeded;
+                renderMakeTenDiagram(q, step, `先睇大數 <strong class="text-sky-600">${q.num1}</strong>，仲差幾多就湊成 <strong class="text-amber-600">10</strong>？`);
+
+                currentHintSpeechText = `大數 ${q.num1} 同 ${q.splitNeeded} 湊成 10。所以第一步要揀 ${q.splitNeeded}。`;
+                document.getElementById('hint-content').innerHTML = `
+                    <div class="text-center space-y-2">
+                        <p class="text-sm">大數 ${q.num1} 同幾多湊成 10？</p>
+                        <div class="flex justify-center items-center gap-3 text-lg font-black">
+                            <span class="text-sky-600">${q.num1}</span>
+                            <span>+</span>
+                            <span class="bg-amber-200 text-amber-900 px-3 py-1 rounded-xl animate-pulse">${q.splitNeeded}</span>
+                            <span>= 10</span>
+                        </div>
+                    </div>
+                `;
+
+                prompt = `我哋用湊十法。先睇大數 ${q.num1}。${q.num1} 同幾多湊成 10 呀？揀返個數字。`;
+                renderMultipleChoiceOptions(q.splitNeeded, 1, 9, optionsBox);
+            } else if (step === 2) {
+                q.ans = q.remain;
+                renderMakeTenDiagram(q, step, `細數 <strong class="text-emerald-600">${q.num2}</strong> 可以分成 <strong class="text-amber-600">${q.splitNeeded}</strong> 同幾多？`);
+
+                currentHintSpeechText = `細數 ${q.num2} 分成 ${q.splitNeeded} 同 ${q.remain}，因為 ${q.splitNeeded} 加 ${q.remain} 等於 ${q.num2}。`;
+                document.getElementById('hint-content').innerHTML = `
+                    <div class="text-center space-y-2">
+                        <p class="text-sm">細數 ${q.num2} 可以分成：</p>
+                        <div class="flex justify-center items-center gap-3 text-lg font-black">
+                            <span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-xl">${q.splitNeeded}</span>
+                            <span>同</span>
+                            <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-xl animate-pulse">${q.remain}</span>
+                        </div>
+                        <p class="text-xs text-slate-600">合起來：${q.splitNeeded} + ${q.remain} = <strong>${q.num2}</strong></p>
+                    </div>
+                `;
+
+                prompt = `好叻！而家睇細數 ${q.num2}。${q.num2} 可以分成 ${q.splitNeeded} 同幾多呀？`;
+                renderMultipleChoiceOptions(q.remain, 1, q.num2 - 1, optionsBox);
+            } else {
+                q.ans = q.total;
+                renderMakeTenDiagram(q, step, `最後答案：<strong class="text-sky-600">${q.num1}</strong> + <strong class="text-amber-600">${q.splitNeeded}</strong> + <strong class="text-emerald-600">${q.remain}</strong> = 幾多？`);
+
+                currentHintSpeechText = `${q.num1} 加 ${q.splitNeeded} 等於 10，10 再加 ${q.remain} 等於 ${q.total}。所以 ${q.num1} 加 ${q.num2} 等於 ${q.total}。`;
+                document.getElementById('hint-content').innerHTML = `
+                    <div class="flex flex-col items-center gap-2">
+                        <p class="text-sm">兩步合起來：</p>
+                        <p class="text-base font-black text-sky-700">${q.num1} + ${q.splitNeeded} = 10</p>
+                        <p class="text-base font-black text-amber-700">10 + ${q.remain} = <span class="text-emerald-700">${q.total}</span></p>
+                        <p class="text-sm font-black text-slate-700">${q.num1} + ${q.num2} = ${q.total}</p>
+                    </div>
+                `;
+
+                prompt = `最後一步。${q.num1} 加 ${q.splitNeeded} 等於 10，10 再加 ${q.remain}。咁 ${q.num1} 加 ${q.num2} 等於幾多呀？`;
+                renderMultipleChoiceOptions(q.total, 10, 20, optionsBox);
+            }
+
+            requestAnimationFrame(() => layoutMakeTenDiagram());
+
+            // Speak the instruction for this step after the new options render.
+            setTimeout(() => {
+                const game = document.getElementById('game-screen');
+                if (currentQuestion === q && currentQuestion.step === step && game && !game.classList.contains('hidden')) {
+                    speakCantonese(prompt);
+                }
+            }, 350);
+        }
+
+        // One fixed diagram is reused for all three picks:
+        //   full formula, with the smaller addend split into two leaves below it.
+        // Filled leaves and the |_| grouping bracket grow in place, so the view
+        // never jumps between different layouts.
+        function renderMakeTenDiagram(q, step, instruction) {
+            const formulaBox = document.getElementById('formula-container');
+            const visualArea = document.getElementById('visual-area');
+            if (!formulaBox || !visualArea) return;
+
+            formulaBox.innerHTML = `
+                <span>${q.num1}</span>
+                <span class="text-emerald-500">+</span>
+                <span>${q.num2}</span>
+                <span class="text-slate-400">=</span>
+                <span class="inline-block border-b-4 border-dashed border-emerald-400 w-16 text-center text-emerald-600">?</span>
+            `;
+
+            const stepBadge = `
+                <div class="flex items-center gap-1.5" aria-label="第 ${step} 步，共 3 步">
+                    ${[1, 2, 3].map((n) => `
+                        <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
+                            n === step ? 'bg-sky-500 text-white' : n < step ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                        }">${n < step ? '✓' : n}</span>
+                    `).join('')}
+                </div>
+            `;
+
+            const leftLeaf = step >= 2
+                ? `<span data-mt="leaf1" class="bg-amber-200 text-amber-900 ring-2 ring-amber-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.splitNeeded}</span>`
+                : `<span data-mt="leaf1" class="bg-white border-2 border-dashed border-amber-400 text-amber-500 font-black text-xl px-4 py-1.5 rounded-xl animate-pulse">?</span>`;
+            const rightLeaf = step >= 3
+                ? `<span data-mt="leaf2" class="bg-emerald-200 text-emerald-900 ring-2 ring-emerald-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.remain}</span>`
+                : `<span data-mt="leaf2" class="bg-white border-2 border-dashed border-emerald-300 text-emerald-400 font-black text-xl px-4 py-1.5 rounded-xl ${step === 2 ? 'animate-pulse' : ''}">?</span>`;
+
+            const finalLine = step === 3
+                ? `<div class="flex items-center justify-center gap-1.5 text-base md:text-lg font-black text-slate-700 bg-slate-50 border border-slate-200 rounded-full px-4 py-1">
+                       <span class="text-sky-600">${q.num1}</span><span class="text-slate-400">+</span>
+                       <span class="text-amber-600">${q.splitNeeded}</span><span class="text-slate-400">+</span>
+                       <span class="text-emerald-600">${q.remain}</span><span class="text-slate-400">=</span>
+                       <span class="text-slate-400">?</span>
+                   </div>`
+                : '';
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center gap-3 w-full">
+                    ${stepBadge}
+                    <p class="text-xs md:text-sm font-bold text-slate-500 text-center">${instruction}</p>
+                    <div id="mt-diagram" class="relative flex flex-col items-center px-8 pt-1">
+                        <div id="mt-eq" class="flex items-center gap-2 md:gap-3 text-3xl md:text-4xl font-black">
+                            <span data-mt="num1" class="text-sky-600 bg-sky-50 ring-2 ring-sky-200 px-1.5 rounded-xl">${q.num1}</span>
+                            <span class="text-emerald-500">+</span>
+                            <span data-mt="num2" class="text-slate-700 px-1.5 rounded-xl">${q.num2}</span>
+                            <span class="text-slate-400">=</span>
+                            <span class="text-slate-400 px-1.5">?</span>
+                        </div>
+                        <div id="mt-bond" class="relative mt-5 flex flex-col items-center">
+                            <div class="flex items-start gap-5 sm:gap-6">${leftLeaf}${rightLeaf}</div>
+                            <div class="h-9" aria-hidden="true"></div>
+                        </div>
+                        ${finalLine ? `<div class="mt-2">${finalLine}</div>` : ''}
+                        <svg id="mt-lines" class="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true"></svg>
+                    </div>
+                </div>
+            `;
+        }
+
+        function layoutMakeTenDiagram() {
+            const diagram = document.getElementById('mt-diagram');
+            if (!diagram) return;
+            const eq = document.getElementById('mt-eq');
+            const num1 = diagram.querySelector('[data-mt="num1"]');
+            const num2 = diagram.querySelector('[data-mt="num2"]');
+            const leaf1 = diagram.querySelector('[data-mt="leaf1"]');
+            const leaf2 = diagram.querySelector('[data-mt="leaf2"]');
+            const bond = document.getElementById('mt-bond');
+            const svg = document.getElementById('mt-lines');
+            if (!eq || !num1 || !num2 || !leaf1 || !leaf2 || !bond || !svg) return;
+
+            // Place the two leaves directly under the smaller addend.
+            bond.style.transform = 'none';
+            const dr = diagram.getBoundingClientRect();
+            const nr = num2.getBoundingClientRect();
+            const dx = (nr.left + nr.width / 2) - (dr.left + dr.width / 2);
+            bond.style.transform = `translateX(${dx}px)`;
+
+            // Measure after the shift so the connector lines match the leaves.
+            const dr2 = diagram.getBoundingClientRect();
+            const n1r = num1.getBoundingClientRect();
+            const n2r = num2.getBoundingClientRect();
+            const l1r = leaf1.getBoundingClientRect();
+            const l2r = leaf2.getBoundingClientRect();
+            const w = Math.ceil(dr2.width);
+            const h = Math.ceil(dr2.height);
+            svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+            svg.setAttribute('width', String(w));
+            svg.setAttribute('height', String(h));
+
+            const rel = (r) => ({
+                top: r.top - dr2.top,
+                bottom: r.bottom - dr2.top,
+                cx: r.left - dr2.left + r.width / 2,
+            });
+            const n1 = rel(n1r);
+            const l1 = rel(l1r);
+            const l2 = rel(l2r);
+            // Straight /\ lines from the small number down to its two parts.
+            const root = {
+                x: n2r.left - dr2.left + n2r.width / 2,
+                y: n2r.bottom - dr2.top + 2,
+            };
+
+            // 5 splits into the two leaves.
+            const bondLine = (leaf) => `<path d="M ${root.x} ${root.y} L ${leaf.cx} ${leaf.top}" fill="none" stroke="#6ee7b7" stroke-width="3" stroke-linecap="round" />`;
+            // A |_| bracket under the big number and the first picked part
+            // shows that those two are grouped to make ten.
+            const leftX = n1.cx;
+            const rightX = l1.cx;
+            const bracketY = Math.max(n1.bottom, l1.bottom) + 14;
+            const groupLine = `<path d="M ${leftX} ${n1.bottom + 4} L ${leftX} ${bracketY} L ${rightX} ${bracketY} L ${rightX} ${l1.bottom + 4}" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
+            const bracketLabel = `<text x="${(leftX + rightX) / 2}" y="${bracketY + 16}" text-anchor="middle" font-size="16" font-weight="800" fill="#b45309" font-family="ui-sans-serif, system-ui, sans-serif">10</text>`;
+
+            svg.innerHTML = bondLine(l1) + bondLine(l2) + groupLine + bracketLabel;
+        }
+
+        // Keep the bond/bracket aligned when the layout reflows.
+        window.addEventListener('resize', () => {
+            if (document.getElementById('mt-diagram')) layoutMakeTenDiagram();
+            if (document.getElementById('bt-diagram')) layoutBreakTenDiagram();
+            if (document.getElementById('pt-diagram')) layoutPingTenDiagram();
+        });
+
+        // Stage 14: guided break-ten preparation.
+        // One question has three picks, e.g. 13 - 8:
+        //   1) 13 = 10 + ?   -> 3
+        //   2) 10 - 8 = ?    -> 2
+        //   3) 3 + 2 = ?     -> 5
+        function generateStage14(formulaBox, visualArea, optionsBox) {
+            const ones = randomInt(1, 4);
+            const minuend = 10 + ones;
+            const subtrahend = randomInt(8, 9);
+            const tenMinusSub = 10 - subtrahend;
+
+            currentQuestion = {
+                kind: 'breakTenPrep',
+                step: 1,
+                minuend,
+                subtrahend,
+                ones,
+                tenMinusSub,
+                total: minuend - subtrahend,
+                ans: ones
+            };
+
+            renderBreakTenPrepStep(1);
+        }
+
+        function renderBreakTenPrepStep(step) {
+            const q = currentQuestion;
+            if (!q || q.kind !== 'breakTenPrep') return;
+
+            const optionsBox = document.getElementById('answer-options');
+            if (!optionsBox) return;
+
+            q.step = step;
+            answerLocked = false;
+            hideHint();
+
+            let prompt = '';
+
+            if (step === 1) {
+                q.ans = q.ones;
+                renderBreakTenDiagram(q, step, `${q.minuend} 可以分成幾多同 <strong class="text-purple-700">10</strong>？<span class="text-slate-400">(? + 10 = ${q.minuend})</span>`);
+
+                currentHintSpeechText = `因為 10 加 ${q.ones} 等於 ${q.minuend}，所以 ${q.minuend} 可以分成 10 同 ${q.ones}。`;
+                document.getElementById('hint-content').innerHTML = `
+                    <div class="text-center space-y-2">
+                        <p class="text-sm">幾多加 10 等於 ${q.minuend}？</p>
+                        <div class="flex justify-center items-center gap-3 text-lg font-black">
+                            <span class="bg-amber-200 text-amber-900 px-3 py-1 rounded-xl animate-pulse">${q.ones}</span>
+                            <span>+</span>
+                            <span class="text-purple-700">10</span>
+                            <span>=</span>
+                            <span>${q.minuend}</span>
+                        </div>
+                    </div>
+                `;
+
+                prompt = `我哋用破十法。${q.minuend} 可以分成幾多同 10 呀？即係幾多加 10 等於 ${q.minuend}？`;
+                renderMultipleChoiceOptions(q.ones, 1, 9, optionsBox);
+            } else if (step === 2) {
+                q.ans = q.tenMinusSub;
+
+                const cells = Array.from({ length: 10 }, (_, i) => {
+                    if (i < q.subtrahend) {
+                        return `<div class="rounded-full bg-slate-300 line-through opacity-50 text-white text-[10px] flex items-center justify-center"><i class="fa-solid fa-circle"></i></div>`;
+                    }
+                    return `<div class="rounded-full bg-purple-500 text-white text-[10px] flex items-center justify-center"><i class="fa-solid fa-circle"></i></div>`;
+                }).join('');
+
+                renderBreakTenDiagram(q, step, `<strong class="text-purple-700">10</strong> - <strong class="text-rose-600">${q.subtrahend}</strong> = 幾多？`);
+
+                currentHintSpeechText = `10 減 ${q.subtrahend} 等於 ${q.tenMinusSub}。`;
+                document.getElementById('hint-content').innerHTML = `
+                    <div class="flex flex-col items-center gap-2">
+                        <p class="text-sm">10 個裡面拿走 ${q.subtrahend} 個</p>
+                        <div class="ten-frame-grid w-40 h-20 bg-purple-50 border-2 border-purple-300 rounded-xl p-1.5 shadow">${cells}</div>
+                        <p class="text-base font-black text-purple-700">10 - ${q.subtrahend} = ${q.tenMinusSub}</p>
+                    </div>
+                `;
+
+                prompt = `而家用 10 減 ${q.subtrahend}，等於幾多呀？`;
+                renderMultipleChoiceOptions(q.tenMinusSub, 1, 9, optionsBox);
+            } else {
+                q.ans = q.total;
+                renderBreakTenDiagram(q, step, `最後答案：<strong class="text-amber-600">${q.ones}</strong> + <strong class="text-emerald-600">${q.tenMinusSub}</strong> = 幾多？`);
+
+                currentHintSpeechText = `10 減 ${q.subtrahend} 剩 ${q.tenMinusSub}，再加個位 ${q.ones}，等於 ${q.total}。所以 ${q.minuend} 減 ${q.subtrahend} 等於 ${q.total}。`;
+                document.getElementById('hint-content').innerHTML = `
+                    <div class="flex flex-col items-center gap-2">
+                        <p class="text-sm">兩步合起來：</p>
+                        <p class="text-base font-black text-purple-700">10 - ${q.subtrahend} = ${q.tenMinusSub}</p>
+                        <p class="text-base font-black text-amber-700">${q.ones} + ${q.tenMinusSub} = <span class="text-emerald-700">${q.total}</span></p>
+                        <p class="text-sm font-black text-slate-700">${q.minuend} - ${q.subtrahend} = ${q.total}</p>
+                    </div>
+                `;
+
+                prompt = `最後一步。${q.ones} 加 ${q.tenMinusSub} 等於幾多呀？`;
+                renderMultipleChoiceOptions(q.total, 1, 9, optionsBox);
+            }
+
+            requestAnimationFrame(() => layoutBreakTenDiagram());
+
+            setTimeout(() => {
+                const game = document.getElementById('game-screen');
+                if (currentQuestion === q && currentQuestion.step === step && game && !game.classList.contains('hidden')) {
+                    speakCantonese(prompt);
+                }
+            }, 350);
+        }
+
+        // Same idea as the make-ten diagram: keep one view and fill it in.
+        // 13 splits into 10 and the ones digit, then 10 splits into the
+        // subtrahend and the amount left over.
+        function renderBreakTenDiagram(q, step, instruction) {
+            const formulaBox = document.getElementById('formula-container');
+            const visualArea = document.getElementById('visual-area');
+            if (!formulaBox || !visualArea) return;
+
+            formulaBox.innerHTML = `
+                <span class="text-rose-600">${q.minuend}</span>
+                <span class="text-rose-500">-</span>
+                <span>${q.subtrahend}</span>
+                <span class="text-slate-400">=</span>
+                <span class="inline-block border-b-4 border-dashed border-rose-400 w-16 text-center text-rose-600">?</span>
+            `;
+
+            const stepBadge = `
+                <div class="flex items-center gap-1.5" aria-label="第 ${step} 步，共 3 步">
+                    ${[1, 2, 3].map((n) => `
+                        <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
+                            n === step ? 'bg-rose-500 text-white' : n < step ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                        }">${n < step ? '✓' : n}</span>
+                    `).join('')}
+                </div>
+            `;
+
+            const tenLeaf = `<span data-bt="ten" class="bg-purple-200 text-purple-900 ring-2 ring-purple-300 font-black text-xl px-3 py-1.5 rounded-xl shadow">10</span>`;
+            const onesLeaf = step >= 2
+                ? `<span data-bt="ones" class="bg-amber-200 text-amber-900 ring-2 ring-amber-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.ones}</span>`
+                : `<span data-bt="ones" class="bg-white border-2 border-dashed border-amber-400 text-amber-500 font-black text-xl px-4 py-1.5 rounded-xl animate-pulse">?</span>`;
+            // 10 − 9 reuses the "10" leaf and the 9 from the original equation,
+            // so only the picked answer needs its own box.
+            const resultLeaf = step >= 3
+                ? `<span data-bt="result" class="absolute z-10 bg-emerald-200 text-emerald-900 ring-2 ring-emerald-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.tenMinusSub}</span>`
+                : `<span data-bt="result" class="absolute z-10 bg-white border-2 border-dashed border-emerald-300 text-emerald-400 font-black text-xl px-4 py-1.5 rounded-xl ${step === 2 ? 'animate-pulse' : ''}">?</span>`;
+            // The final answer is the sum of the ones digit and the result of
+            // 10 − subtrahend, so those two are joined by a bracket too.
+            const totalLeaf = `<span data-bt="total" class="absolute z-10 bg-white border-2 border-dashed border-emerald-300 text-emerald-400 font-black text-xl px-4 py-1.5 rounded-xl ${step === 3 ? 'animate-pulse' : ''}">?</span>`;
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center gap-3 w-full">
+                    ${stepBadge}
+                    <p class="text-xs md:text-sm font-bold text-slate-500 text-center">${instruction}</p>
+                    <div id="bt-diagram" data-step="${step}" class="relative flex flex-col items-center px-6 pt-1">
+                        <div id="bt-eq" class="flex items-center gap-2 md:gap-3 text-3xl md:text-4xl font-black">
+                            <span data-bt="minuend" class="text-rose-600 bg-rose-50 ring-2 ring-rose-200 px-1.5 rounded-xl">${q.minuend}</span>
+                            <span class="text-rose-500">-</span>
+                            <span data-bt="subtrahend" class="text-slate-700 px-1.5 rounded-xl">${q.subtrahend}</span>
+                            <span class="text-slate-400">=</span>
+                            <span class="text-slate-400 px-1.5">?</span>
+                        </div>
+                        <div id="bt-bond" class="relative mt-5 flex flex-col items-center">
+                            <div class="flex items-start gap-5 sm:gap-6">${onesLeaf}${tenLeaf}</div>
+                        </div>
+                        <div class="h-44" aria-hidden="true"></div>
+                        <span id="bt-minus" class="absolute z-10 text-rose-500 font-black text-2xl leading-none" aria-hidden="true">−</span>
+                        ${resultLeaf}
+                        <span id="bt-plus" class="absolute z-10 text-emerald-600 font-black text-2xl leading-none" aria-hidden="true">+</span>
+                        ${totalLeaf}
+                        <svg id="bt-lines" class="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true"></svg>
+                    </div>
+                </div>
+            `;
+        }
+
+        function layoutBreakTenDiagram() {
+            const diagram = document.getElementById('bt-diagram');
+            if (!diagram) return;
+            const minuend = diagram.querySelector('[data-bt="minuend"]');
+            const subtrahend = diagram.querySelector('[data-bt="subtrahend"]');
+            const topBond = document.getElementById('bt-bond');
+            const ten = diagram.querySelector('[data-bt="ten"]');
+            const ones = diagram.querySelector('[data-bt="ones"]');
+            const result = diagram.querySelector('[data-bt="result"]');
+            const total = diagram.querySelector('[data-bt="total"]');
+            const minus = document.getElementById('bt-minus');
+            const plus = document.getElementById('bt-plus');
+            const svg = document.getElementById('bt-lines');
+            if (!minuend || !subtrahend || !topBond || !ten || !ones || !result || !total || !minus || !plus || !svg) return;
+
+            // Top bond sits under the minuend.
+            topBond.style.transform = 'none';
+            const dr = diagram.getBoundingClientRect();
+            const mr = minuend.getBoundingClientRect();
+            const dxTop = (mr.left + mr.width / 2) - (dr.left + dr.width / 2);
+            topBond.style.transform = `translateX(${dxTop}px)`;
+
+            // Measure after the shift so the lines match the leaves.
+            const dr3 = diagram.getBoundingClientRect();
+            const mr2 = minuend.getBoundingClientRect();
+            const sr = subtrahend.getBoundingClientRect();
+            const tr2 = ten.getBoundingClientRect();
+            const or = ones.getBoundingClientRect();
+            const w = Math.ceil(dr3.width);
+            const h = Math.ceil(dr3.height);
+            svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+            svg.setAttribute('width', String(w));
+            svg.setAttribute('height', String(h));
+
+            const rel = (r) => ({
+                top: r.top - dr3.top,
+                bottom: r.bottom - dr3.top,
+                cx: r.left - dr3.left + r.width / 2,
+            });
+            const m = rel(mr2);
+            const s = rel(sr);
+            const t = rel(tr2);
+            const o = rel(or);
+            const line = (x1, y1, x2, y2, color) => `<path d="M ${x1} ${y1} L ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" />`;
+
+            // A |_| bracket joins the "10" leaf with the 9 from the original
+            // equation. The minus sits just above the bar and the picked answer
+            // sits just below the bar.
+            const bracketY = t.bottom + 30;
+            const leftX = t.cx;
+            const rightX = s.cx;
+            const bracket = `<path d="M ${leftX} ${t.bottom + 4} L ${leftX} ${bracketY} L ${rightX} ${bracketY} L ${rightX} ${s.bottom + 4}" fill="none" stroke="#fb7185" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
+
+            const midX = (leftX + rightX) / 2;
+            minus.style.left = `${midX}px`;
+            minus.style.top = `${bracketY - 8}px`;
+            minus.style.transform = 'translate(-50%, -100%)';
+            result.style.left = `${midX}px`;
+            result.style.top = `${bracketY + 10}px`;
+            result.style.transform = 'translateX(-50%)';
+
+            // Then the ones digit and that result are joined by a second
+            // bracket, with a plus above the bar and the final answer below it.
+            const rr = result.getBoundingClientRect();
+            const r = rel(rr);
+            const plusY = r.bottom + 24;
+            const plusLeftX = o.cx;
+            const plusRightX = r.cx;
+            const plusBracket = `<path d="M ${plusLeftX} ${o.bottom + 4} L ${plusLeftX} ${plusY} L ${plusRightX} ${plusY} L ${plusRightX} ${r.bottom + 4}" fill="none" stroke="#34d399" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
+
+            svg.innerHTML =
+                line(m.cx, m.bottom + 2, o.cx, o.top, '#a78bfa') +
+                line(m.cx, m.bottom + 2, t.cx, t.top, '#a78bfa') +
+                bracket +
+                plusBracket;
+
+            const plusMidX = (plusLeftX + plusRightX) / 2;
+            plus.style.left = `${plusMidX}px`;
+            plus.style.top = `${plusY - 8}px`;
+            plus.style.transform = 'translate(-50%, -100%)';
+            total.style.left = `${plusMidX}px`;
+            total.style.top = `${plusY + 10}px`;
+            total.style.transform = 'translateX(-50%)';
+        }
+
+        // --- STAGE 15: 平十法準備 (兩步拆數連減) ---
+        // One question has two picks, e.g. 14 - 6:
+        //   1) 6 = 4 + ?   -> 2
+        //   2) 10 - 2 = ?  -> 8
+        function generateStage15(formulaBox, visualArea, optionsBox) {
+            const ones = randomInt(2, 5);
+            const minuend = 10 + ones;
+            const remain = randomInt(2, 4);
+            const subtrahend = ones + remain;
+            const total = 10 - remain;
+
+            currentQuestion = {
+                kind: 'pingTenPrep',
+                step: 1,
+                minuend,
+                subtrahend,
+                ones,
+                remain,
+                total,
+                ans: remain,
+            };
+
+            renderPingTenPrepStep(1);
+        }
+
+        function renderPingTenPrepStep(step) {
+            const q = currentQuestion;
+            if (!q || q.kind !== 'pingTenPrep') return;
+
+            const optionsBox = document.getElementById('answer-options');
+            if (!optionsBox) return;
+
+            q.step = step;
+            answerLocked = false;
+            hideHint();
+
+            let prompt = '';
+
+            if (step === 1) {
+                q.ans = q.remain;
+                renderPingTenDiagram(q, step, `<strong class="text-rose-600">${q.subtrahend}</strong> 可以分成 <strong class="text-amber-600">${q.ones}</strong> 同幾多？<span class="text-slate-400">(${q.minuend} - ${q.ones} = 10)</span>`);
+
+                currentHintSpeechText = `${q.subtrahend} 可以分成 ${q.ones} 同 ${q.remain}。因為 ${q.minuend} 減 ${q.ones} 等於 10，所以先減 ${q.ones}，再減 ${q.remain}。`;
+                document.getElementById('hint-content').innerHTML = `
+                    <div class="flex flex-col items-center gap-2">
+                        <p class="text-sm">${q.subtrahend} 可以分成 ${q.ones} 同 ${q.remain}</p>
+                        <div class="flex justify-center items-center gap-3 text-lg font-black">
+                            <span class="text-amber-600">${q.ones}</span>
+                            <span>+</span>
+                            <span class="bg-amber-200 text-amber-900 px-3 py-1 rounded-xl animate-pulse">${q.remain}</span>
+                            <span>=</span>
+                            <span class="text-rose-600">${q.subtrahend}</span>
+                        </div>
+                        <p class="text-xs text-slate-600">${q.minuend} - ${q.ones} = 10，然後再減 ${q.remain}</p>
+                    </div>
+                `;
+
+                prompt = `我哋用平十法。${q.subtrahend} 可以分成 ${q.ones} 同幾多呀？`;
+                renderMultipleChoiceOptions(q.remain, 1, 9, optionsBox);
+            } else {
+                q.ans = q.total;
+                renderPingTenDiagram(q, step, `而家用 <strong class="text-purple-700">10</strong> 減 <strong class="text-amber-600">${q.remain}</strong>，等於幾多？`);
+
+                currentHintSpeechText = `10 減 ${q.remain} 等於 ${q.total}。所以 ${q.minuend} 減 ${q.subtrahend} 等於 ${q.total}。`;
+                document.getElementById('hint-content').innerHTML = `
+                    <div class="flex flex-col items-center gap-2">
+                        <p class="text-sm">先減 ${q.ones} 到 10，再減 ${q.remain}</p>
+                        <p class="text-base font-black text-purple-700">10 - ${q.remain} = <span class="text-emerald-700">${q.total}</span></p>
+                        <p class="text-sm font-black text-slate-700">${q.minuend} - ${q.subtrahend} = ${q.total}</p>
+                    </div>
+                `;
+
+                prompt = `而家用 10 減 ${q.remain}，等於幾多呀？`;
+                renderMultipleChoiceOptions(q.total, 1, 9, optionsBox);
+            }
+
+            requestAnimationFrame(() => layoutPingTenDiagram());
+
+            setTimeout(() => {
+                const game = document.getElementById('game-screen');
+                if (currentQuestion === q && currentQuestion.step === step && game && !game.classList.contains('hidden')) {
+                    speakCantonese(prompt);
+                }
+            }, 350);
+        }
+
+        function renderPingTenDiagram(q, step, instruction) {
+            const formulaBox = document.getElementById('formula-container');
+            const visualArea = document.getElementById('visual-area');
+            if (!formulaBox || !visualArea) return;
+
+            formulaBox.innerHTML = `
+                <span class="text-rose-600">${q.minuend}</span>
+                <span class="text-rose-500">-</span>
+                <span>${q.subtrahend}</span>
+                <span class="text-slate-400">=</span>
+                <span class="inline-block border-b-4 border-dashed border-rose-400 w-16 text-center text-rose-600">?</span>
+            `;
+
+            const stepBadge = `
+                <div class="flex items-center gap-1.5" aria-label="第 ${step} 步，共 2 步">
+                    ${[1, 2].map((n) => `
+                        <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
+                            n === step ? 'bg-indigo-500 text-white' : n < step ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                        }">${n < step ? '✓' : n}</span>
+                    `).join('')}
+                </div>
+            `;
+
+            const part1 = `<span data-pt="part1" class="border-2 border-transparent bg-amber-200 text-amber-900 ring-2 ring-amber-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.ones}</span>`;
+            const part2 = step >= 2
+                ? `<span data-pt="part2" class="border-2 border-transparent bg-amber-200 text-amber-900 ring-2 ring-amber-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.remain}</span>`
+                : `<span data-pt="part2" class="bg-white border-2 border-dashed border-amber-400 text-amber-500 font-black text-xl px-4 py-1.5 rounded-xl animate-pulse">?</span>`;
+
+            // Step 2 shows the two-subtraction chain:
+            //   12 − 2 = 10, then 10 − 3 = ?
+            const bracketLayer = step >= 2
+                ? `
+                    <span id="pt-minus" class="absolute z-10 text-rose-500 font-black text-2xl leading-none" aria-hidden="true">−</span>
+                    <span data-pt="ten" class="absolute z-10 bg-purple-200 text-purple-900 ring-2 ring-purple-300 font-black text-xl px-3 py-1.5 rounded-xl shadow">10</span>
+                    <span id="pt-minus2" class="absolute z-10 text-rose-500 font-black text-2xl leading-none" aria-hidden="true">−</span>
+                    <span data-pt="total" class="absolute z-10 bg-white border-2 border-dashed border-emerald-300 text-emerald-400 font-black text-xl px-4 py-1.5 rounded-xl animate-pulse">?</span>
+                `
+                : '';
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center gap-3 w-full">
+                    ${stepBadge}
+                    <p class="text-xs md:text-sm font-bold text-slate-500 text-center">${instruction}</p>
+                    <div id="pt-diagram" data-step="${step}" class="relative flex flex-col items-center px-6 pt-1">
+                        <div id="pt-eq" class="flex items-center gap-2 md:gap-3 text-3xl md:text-4xl font-black">
+                            <span data-pt="minuend" class="text-rose-600 bg-rose-50 ring-2 ring-rose-200 px-1.5 rounded-xl">${q.minuend}</span>
+                            <span class="text-rose-500">-</span>
+                            <span data-pt="subtrahend" class="text-slate-700 px-1.5 rounded-xl">${q.subtrahend}</span>
+                            <span class="text-slate-400">=</span>
+                            <span class="text-slate-400 px-1.5">?</span>
+                        </div>
+                        <div id="pt-bond" class="relative mt-5 flex flex-col items-center">
+                            <div class="flex items-start gap-5 sm:gap-6">${part1}${part2}</div>
+                        </div>
+                        <!-- Keep the bracket area reserved from step 1 so the
+                             layout does not jump after the first pick. -->
+                        <div class="h-44" aria-hidden="true"></div>
+                        ${bracketLayer}
+                        <svg id="pt-lines" class="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true"></svg>
+                    </div>
+                </div>
+            `;
+        }
+
+        function layoutPingTenDiagram() {
+            const diagram = document.getElementById('pt-diagram');
+            if (!diagram) return;
+            const minuend = diagram.querySelector('[data-pt="minuend"]');
+            const subtrahend = diagram.querySelector('[data-pt="subtrahend"]');
+            const bond = document.getElementById('pt-bond');
+            const part1 = diagram.querySelector('[data-pt="part1"]');
+            const part2 = diagram.querySelector('[data-pt="part2"]');
+            const ten = diagram.querySelector('[data-pt="ten"]');
+            const total = diagram.querySelector('[data-pt="total"]');
+            const minus = document.getElementById('pt-minus');
+            const minus2 = document.getElementById('pt-minus2');
+            const svg = document.getElementById('pt-lines');
+            if (!minuend || !subtrahend || !bond || !part1 || !part2 || !svg) return;
+
+            // The bond sits under the subtrahend.
+            bond.style.transform = 'none';
+            const dr = diagram.getBoundingClientRect();
+            const sr0 = subtrahend.getBoundingClientRect();
+            const dx = (sr0.left + sr0.width / 2) - (dr.left + dr.width / 2);
+            bond.style.transform = `translateX(${dx}px)`;
+
+            const dr3 = diagram.getBoundingClientRect();
+            const w = Math.ceil(dr3.width);
+            const h = Math.ceil(dr3.height);
+            svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+            svg.setAttribute('width', String(w));
+            svg.setAttribute('height', String(h));
+
+            const rel = (r) => ({
+                top: r.top - dr3.top,
+                bottom: r.bottom - dr3.top,
+                cx: r.left - dr3.left + r.width / 2,
+            });
+            const m = rel(minuend.getBoundingClientRect());
+            const s = rel(subtrahend.getBoundingClientRect());
+            const p1 = rel(part1.getBoundingClientRect());
+            const p2 = rel(part2.getBoundingClientRect());
+
+            // Straight /\ lines from the subtrahend down to its two parts.
+            const root = { x: s.cx, y: s.bottom + 2 };
+            const bondLine = (leaf) => `<path d="M ${root.x} ${root.y} L ${leaf.cx} ${leaf.top}" fill="none" stroke="#818cf8" stroke-width="3" stroke-linecap="round" />`;
+            let paths = bondLine(p1) + bondLine(p2);
+
+            // Step 2 shows the subtraction chain with two |_| brackets:
+            //   12 − 2 = 10   joins the minuend and the first part
+            //   10 − 3 = ?    joins the new 10 and the remaining part
+            if (ten && total && minus && minus2) {
+                const bracket = (leftX, leftTop, rightX, rightTop, barY) =>
+                    `<path d="M ${leftX} ${leftTop} L ${leftX} ${barY} L ${rightX} ${barY} L ${rightX} ${rightTop}" fill="none" stroke="#fb7185" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
+
+                const bar1Y = Math.max(m.bottom, p1.bottom) + 28;
+                const left1X = m.cx;
+                const right1X = p1.cx;
+                const mid1X = (left1X + right1X) / 2;
+
+                minus.style.left = `${mid1X}px`;
+                minus.style.top = `${bar1Y - 8}px`;
+                minus.style.transform = 'translate(-50%, -100%)';
+
+                ten.style.left = `${mid1X}px`;
+                ten.style.top = `${bar1Y + 10}px`;
+                ten.style.transform = 'translateX(-50%)';
+
+                const t = rel(ten.getBoundingClientRect());
+                const bar2Y = Math.max(t.bottom, p2.bottom) + 28;
+                const left2X = t.cx;
+                const right2X = p2.cx;
+                const mid2X = (left2X + right2X) / 2;
+
+                minus2.style.left = `${mid2X}px`;
+                minus2.style.top = `${bar2Y - 8}px`;
+                minus2.style.transform = 'translate(-50%, -100%)';
+
+                total.style.left = `${mid2X}px`;
+                total.style.top = `${bar2Y + 10}px`;
+                total.style.transform = 'translateX(-50%)';
+
+                paths += bracket(left1X, m.bottom + 4, right1X, p1.bottom + 4, bar1Y);
+                paths += bracket(left2X, t.bottom + 4, right2X, p2.bottom + 4, bar2Y);
+            }
+
+            svg.innerHTML = paths;
+        }
+
         // --- HELPER: RENDER MULTIPLE CHOICE BUTTONS ---
         function renderMultipleChoiceOptions(correctAns, minVal, maxVal, container) {
             let options = new Set();
@@ -1144,12 +1890,56 @@
             if (note) note.classList.toggle('hidden', !show);
         }
 
+        // Preparation levels ask several picks before the real answer.
+        function prepStepCount(kind) {
+            if (kind === 'makeTenPrep' || kind === 'breakTenPrep') return 3;
+            if (kind === 'pingTenPrep') return 2;
+            return 0;
+        }
+
         function checkAnswer(selected, btnEl) {
             if (answerLocked) return;
             answerLocked = true;
 
-            if (selected === currentQuestion.ans) {
+            const question = currentQuestion;
+            const prepSteps = question ? prepStepCount(question.kind) : 0;
+            const isMultiStep = prepSteps > 0;
+            const step = isMultiStep ? question.step : 0;
+            const isFinalStep = !isMultiStep || step >= prepSteps;
+
+            if (selected === question.ans) {
                 playSound('correct');
+
+                // The preparation levels have several picks. Earlier picks only
+                // move to the next step; the point is decided by the final
+                // answer, and still requires no wrong answer or hint.
+                if (isMultiStep && !isFinalStep) {
+                    btnEl.classList.remove('bg-sky-500', 'border-sky-700');
+                    btnEl.classList.add('bg-emerald-500', 'border-emerald-700');
+
+                    setTimeout(() => {
+                        const game = document.getElementById('game-screen');
+                        if (currentQuestion !== question || question.step !== step) return;
+                        if (game && game.classList.contains('hidden')) return;
+                        if (question.kind === 'makeTenPrep') {
+                            renderMakeTenPrepStep(step + 1);
+                        } else if (question.kind === 'breakTenPrep') {
+                            renderBreakTenPrepStep(step + 1);
+                        } else {
+                            renderPingTenPrepStep(step + 1);
+                        }
+                    }, 650);
+                    return;
+                }
+
+                // Show the completed answer in the diagram before moving on.
+                if (isMultiStep && isFinalStep) {
+                    const totalLeaf = document.querySelector('[data-bt="total"], [data-pt="total"]');
+                    if (totalLeaf) {
+                        totalLeaf.textContent = String(question.ans);
+                        totalLeaf.className = 'absolute z-10 bg-emerald-200 text-emerald-900 ring-2 ring-emerald-300 font-black text-xl px-4 py-1.5 rounded-xl shadow';
+                    }
+                }
 
                 // A question only earns a point if the child got it right on the
                 // first try without opening the hint.
@@ -1177,16 +1967,22 @@
                 // Auto next question after short delay
                 setTimeout(() => {
                     loadQuestion();
-                }, 1200);
+                }, isMultiStep ? 1600 : 1200);
 
             } else {
                 playSound('wrong');
                 questionMissed = true;
                 setPointNote(true);
-                if (window.GameProgress) {
-                    window.GameProgress.record(currentStage, false);
+
+                // Preparation substeps are part of one question, so only the final
+                // pick counts toward the level's answer stats.
+                if (isFinalStep) {
+                    if (window.GameProgress) {
+                        window.GameProgress.record(currentStage, false);
+                    }
+                    updateLocalProgress(false);
                 }
-                updateLocalProgress(false);
+
                 btnEl.classList.remove('bg-sky-500', 'border-sky-700');
                 btnEl.classList.add('bg-rose-500', 'border-rose-700', 'animate-shake');
 

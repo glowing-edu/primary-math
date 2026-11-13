@@ -10,7 +10,7 @@ const PROGRESS_PREFIX = 'primary-math-progress-v1-'
 export const DELETED_RETENTION_DAYS = 30
 const DELETED_RETENTION_MS = DELETED_RETENTION_DAYS * 24 * 60 * 60 * 1000
 
-export const STAGE_COUNT = 12
+export const STAGE_COUNT = 15
 
 export const DEFAULT_PROGRESS = {
   score: 0, // points shown in the game (1 per correct answer)
