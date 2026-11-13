@@ -1229,8 +1229,9 @@
 
         // One fixed diagram is reused for all three picks:
         //   full formula, with the smaller addend split into two leaves below it.
-        // Filled leaves and the |_| grouping bracket grow in place, so the view
-        // never jumps between different layouts.
+        // The first bracket groups the big addend with the first split part to
+        // show 10. The last step adds a second bracket linking that 10 to the
+        // remaining part. Space for both brackets is reserved in every step.
         function renderMakeTenDiagram(q, step, instruction) {
             const formulaBox = document.getElementById('formula-container');
             const visualArea = document.getElementById('visual-area');
@@ -1255,26 +1256,23 @@
             `;
 
             const leftLeaf = step >= 2
-                ? `<span data-mt="leaf1" class="bg-amber-200 text-amber-900 ring-2 ring-amber-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.splitNeeded}</span>`
+                ? `<span data-mt="leaf1" class="border-2 border-transparent bg-amber-200 text-amber-900 ring-2 ring-amber-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.splitNeeded}</span>`
                 : `<span data-mt="leaf1" class="bg-white border-2 border-dashed border-amber-400 text-amber-500 font-black text-xl px-4 py-1.5 rounded-xl animate-pulse">?</span>`;
             const rightLeaf = step >= 3
-                ? `<span data-mt="leaf2" class="bg-emerald-200 text-emerald-900 ring-2 ring-emerald-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.remain}</span>`
+                ? `<span data-mt="leaf2" class="border-2 border-transparent bg-emerald-200 text-emerald-900 ring-2 ring-emerald-300 font-black text-xl px-4 py-1.5 rounded-xl shadow">${q.remain}</span>`
                 : `<span data-mt="leaf2" class="bg-white border-2 border-dashed border-emerald-300 text-emerald-400 font-black text-xl px-4 py-1.5 rounded-xl ${step === 2 ? 'animate-pulse' : ''}">?</span>`;
 
-            const finalLine = step === 3
-                ? `<div class="flex items-center justify-center gap-1.5 text-base md:text-lg font-black text-slate-700 bg-slate-50 border border-slate-200 rounded-full px-4 py-1">
-                       <span class="text-sky-600">${q.num1}</span><span class="text-slate-400">+</span>
-                       <span class="text-amber-600">${q.splitNeeded}</span><span class="text-slate-400">+</span>
-                       <span class="text-emerald-600">${q.remain}</span><span class="text-slate-400">=</span>
-                       <span class="text-slate-400">?</span>
-                   </div>`
+            // The final pick adds a second bracket: 10 + 1 = ?
+            const secondStep = step === 3
+                ? `<span id="mt-plus" class="absolute z-10 text-emerald-600 font-black text-2xl leading-none" aria-hidden="true">+</span>
+                   <span data-mt="total" class="absolute z-10 bg-white border-2 border-dashed border-emerald-300 text-emerald-400 font-black text-xl px-4 py-1.5 rounded-xl animate-pulse">?</span>`
                 : '';
 
             visualArea.innerHTML = `
                 <div class="flex flex-col items-center gap-3 w-full">
                     ${stepBadge}
                     <p class="text-xs md:text-sm font-bold text-slate-500 text-center">${instruction}</p>
-                    <div id="mt-diagram" class="relative flex flex-col items-center px-8 pt-1">
+                    <div id="mt-diagram" data-step="${step}" class="relative flex flex-col items-center px-8 pt-1">
                         <div id="mt-eq" class="flex items-center gap-2 md:gap-3 text-3xl md:text-4xl font-black">
                             <span data-mt="num1" class="text-sky-600 bg-sky-50 ring-2 ring-sky-200 px-1.5 rounded-xl">${q.num1}</span>
                             <span class="text-emerald-500">+</span>
@@ -1284,9 +1282,11 @@
                         </div>
                         <div id="mt-bond" class="relative mt-5 flex flex-col items-center">
                             <div class="flex items-start gap-5 sm:gap-6">${leftLeaf}${rightLeaf}</div>
-                            <div class="h-9" aria-hidden="true"></div>
                         </div>
-                        ${finalLine ? `<div class="mt-2">${finalLine}</div>` : ''}
+                        <!-- Keep the bracket area reserved in every step so the
+                             layout does not jump when the final bracket appears. -->
+                        <div class="h-40" aria-hidden="true"></div>
+                        ${secondStep}
                         <svg id="mt-lines" class="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true"></svg>
                     </div>
                 </div>
@@ -1302,6 +1302,9 @@
             const leaf1 = diagram.querySelector('[data-mt="leaf1"]');
             const leaf2 = diagram.querySelector('[data-mt="leaf2"]');
             const bond = document.getElementById('mt-bond');
+            const plus = document.getElementById('mt-plus');
+            const total = diagram.querySelector('[data-mt="total"]');
+            const step = Number(diagram.dataset.step || 0);
             const svg = document.getElementById('mt-lines');
             if (!eq || !num1 || !num2 || !leaf1 || !leaf2 || !bond || !svg) return;
 
@@ -1349,6 +1352,30 @@
             const bracketLabel = `<text x="${(leftX + rightX) / 2}" y="${bracketY + 16}" text-anchor="middle" font-size="16" font-weight="800" fill="#b45309" font-family="ui-sans-serif, system-ui, sans-serif">10</text>`;
 
             svg.innerHTML = bondLine(l1) + bondLine(l2) + groupLine + bracketLabel;
+
+            // In the last step the "10" label and the remaining leaf are joined
+            // by a second bracket: 10 + 1 = ?. The plus sits above the bar and
+            // the answer box sits below it.
+            if (step === 3 && plus && total) {
+                const textEl = svg.querySelector('text');
+                if (textEl) {
+                    const ten = rel(textEl.getBoundingClientRect());
+                    const bar2Y = Math.max(ten.bottom, l2.bottom) + 14;
+                    const left2X = ten.cx;
+                    const right2X = l2.cx;
+                    const secondBracket = `<path d="M ${left2X} ${ten.bottom + 2} L ${left2X} ${bar2Y} L ${right2X} ${bar2Y} L ${right2X} ${l2.bottom + 4}" fill="none" stroke="#34d399" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
+                    svg.innerHTML += secondBracket;
+
+                    const mid2X = (left2X + right2X) / 2;
+                    plus.style.left = `${mid2X}px`;
+                    plus.style.top = `${bar2Y - 8}px`;
+                    plus.style.transform = 'translate(-50%, -100%)';
+
+                    total.style.left = `${mid2X}px`;
+                    total.style.top = `${bar2Y + 10}px`;
+                    total.style.transform = 'translateX(-50%)';
+                }
+            }
         }
 
         // Keep the bond/bracket aligned when the layout reflows.
@@ -1890,6 +1917,24 @@
             if (note) note.classList.toggle('hidden', !show);
         }
 
+        // Answer buttons swap their whole colour set, including the hover and
+        // active variants. Without that, a correct button would keep its sky
+        // hover colour under the pointer and only the border would turn green.
+        const ANSWER_TONE_CLASSES = {
+            sky: ['bg-sky-500', 'hover:bg-sky-600', 'active:bg-sky-700', 'border-sky-700'],
+            emerald: ['bg-emerald-500', 'hover:bg-emerald-600', 'active:bg-emerald-700', 'border-emerald-700'],
+            rose: ['bg-rose-500', 'hover:bg-rose-600', 'active:bg-rose-700', 'border-rose-700'],
+        };
+
+        function setAnswerButtonTone(btnEl, tone) {
+            btnEl.classList.remove(
+                ...ANSWER_TONE_CLASSES.sky,
+                ...ANSWER_TONE_CLASSES.emerald,
+                ...ANSWER_TONE_CLASSES.rose
+            );
+            btnEl.classList.add(...ANSWER_TONE_CLASSES[tone]);
+        }
+
         // Preparation levels ask several picks before the real answer.
         function prepStepCount(kind) {
             if (kind === 'makeTenPrep' || kind === 'breakTenPrep') return 3;
@@ -1914,8 +1959,7 @@
                 // move to the next step; the point is decided by the final
                 // answer, and still requires no wrong answer or hint.
                 if (isMultiStep && !isFinalStep) {
-                    btnEl.classList.remove('bg-sky-500', 'border-sky-700');
-                    btnEl.classList.add('bg-emerald-500', 'border-emerald-700');
+                    setAnswerButtonTone(btnEl, 'emerald');
 
                     setTimeout(() => {
                         const game = document.getElementById('game-screen');
@@ -1934,7 +1978,7 @@
 
                 // Show the completed answer in the diagram before moving on.
                 if (isMultiStep && isFinalStep) {
-                    const totalLeaf = document.querySelector('[data-bt="total"], [data-pt="total"]');
+                    const totalLeaf = document.querySelector('[data-bt="total"], [data-pt="total"], [data-mt="total"]');
                     if (totalLeaf) {
                         totalLeaf.textContent = String(question.ans);
                         totalLeaf.className = 'absolute z-10 bg-emerald-200 text-emerald-900 ring-2 ring-emerald-300 font-black text-xl px-4 py-1.5 rounded-xl shadow';
@@ -1961,8 +2005,7 @@
                     origin: { y: 0.8 }
                 });
 
-                btnEl.classList.remove('bg-sky-500', 'border-sky-700');
-                btnEl.classList.add('bg-emerald-500', 'border-emerald-700');
+                setAnswerButtonTone(btnEl, 'emerald');
 
                 // Auto next question after short delay
                 setTimeout(() => {
@@ -1983,12 +2026,15 @@
                     updateLocalProgress(false);
                 }
 
-                btnEl.classList.remove('bg-sky-500', 'border-sky-700');
-                btnEl.classList.add('bg-rose-500', 'border-rose-700', 'animate-shake');
+                btnEl.classList.add('animate-shake');
+                setAnswerButtonTone(btnEl, 'rose');
 
                 setTimeout(() => {
-                    btnEl.classList.remove('bg-rose-500', 'border-rose-700', 'animate-shake');
-                    btnEl.classList.add('bg-sky-500', 'border-sky-700');
+                    btnEl.classList.remove('animate-shake');
+                    // Keep the wrong pick red for the rest of this question or
+                    // step, and stop it from being chosen again.
+                    btnEl.disabled = true;
+                    btnEl.classList.add('cursor-not-allowed');
                     answerLocked = false;
                 }, 800);
             }
