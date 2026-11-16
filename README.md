@@ -6,7 +6,7 @@ Built as a static site with Vite and deployed to GitHub Pages.
 
 ## Features
 
-- 🎮 **Five stages** — 10的組成、合十法、破十法、平十法、借十法
+- 🎮 **15 stages** — from counting 1-5 through 湊十法、破十法、平十法、借十法
 - 🗣️ **Cantonese speech** — hints and explanations via the browser Web Speech API
 - 👧🧒 **Multi-profile** — one profile per child, each with their own stars,
   stage progress and answer history
@@ -45,11 +45,13 @@ profile never deletes another child's progress.
 ## Puter sync
 
 1. Click **☁️ 登入同步** in the header and sign in with Puter.
-2. Choose a profile and keep playing — progress auto-uploads a couple of
-   seconds after each answer.
-3. On another device, sign in with the same Puter account: the app pulls the
-   cloud data on load.
-4. **上載本機進度** / **下載雲端進度** force a manual merge in either direction.
+2. Progress auto-syncs to the cloud at most once every **24 hours**. On page
+   load, if the last successful sync is over 24 hours old, the app backs up
+   automatically.
+3. On another device, sign in with the same Puter account and use
+   **下載雲端進度** if you don't want to wait for the next daily sync.
+4. **上載本機進度** / **下載雲端進度** force a manual merge in either direction
+   and are never blocked by the 24-hour interval.
 
 Sync is merge-only: a cloud profile is never removed by an upload, and local
 progress is never overwritten by an older cloud copy. Cloud data lives in the
@@ -77,8 +79,8 @@ npm run preview  # preview the production build
 ## Project structure
 
 ```
-index.html                 # game markup + game engine (Cantonese speech, stages)
-src/main.js                # profile switcher UI + Puter sync panel + boot
+index.html                 # game markup + engine (stages, speech)
+src/main.js                # profile switcher + Puter sync panel + boot
 src/lib/profiles.js        # localStorage multi-profile progress store
 src/lib/puterSync.js       # Puter KV snapshots, merge and sync logic
 public/favicon.svg

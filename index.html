@@ -79,7 +79,7 @@
 <body class="min-h-screen flex flex-col justify-between p-2 md:p-6 text-slate-800">
 
     <!-- Header Navigation & Stage Selector -->
-    <header class="relative z-40 max-w-4xl w-full mx-auto bg-white/90 backdrop-blur-md rounded-3xl p-4 shadow-lg border-4 border-sky-200 mb-4">
+    <header class="relative z-40 max-w-4xl w-full mx-auto bg-white/90 backdrop-blur-md rounded-3xl p-4 md:p-6 shadow-lg border-4 border-sky-200 mb-4">
         <div class="flex flex-col gap-3">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -207,40 +207,57 @@
         // Web Audio API Context for sound effects
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+        // Returns a Promise that settles when the effect has finished, so the
+        // next question can wait for the sound instead of playing over it.
         function playSound(type) {
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
 
-            if (type === 'correct') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
-                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.4);
-            } else if (type === 'wrong') {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(220, audioCtx.currentTime); // A3
-                osc.frequency.setValueAtTime(180, audioCtx.currentTime + 0.15);
-                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.3);
-            } else if (type === 'click') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.05);
-            }
+            return new Promise((resolve) => {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                let duration = 0;
+                if (type === 'correct') {
+                    duration = 0.4;
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+                } else if (type === 'wrong') {
+                    duration = 0.3;
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now); // A3
+                    osc.frequency.setValueAtTime(180, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+                } else if (type === 'click') {
+                    duration = 0.05;
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+                }
+
+                let settled = false;
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    resolve();
+                };
+
+                osc.onended = finish;
+                osc.start(now);
+                osc.stop(now + duration);
+                // Safety net in case onended never fires on an unusual device.
+                setTimeout(finish, (duration + 1) * 1000);
+            });
         }
     </script>
 
@@ -1162,12 +1179,12 @@
 
             if (step === 1) {
                 q.ans = q.splitNeeded;
-                renderMakeTenDiagram(q, step, `先睇大數 <strong class="text-sky-600">${q.num1}</strong>，仲差幾多就湊成 <strong class="text-amber-600">10</strong>？`);
+                renderMakeTenDiagram(q, step, `先睇大數 <strong class="text-sky-600">${q.num1}</strong>，仲差幾多就合成 <strong class="text-amber-600">10</strong>？`);
 
                 currentHintSpeechText = `大數 ${q.num1} 同 ${q.splitNeeded} 湊成 10。所以第一步要揀 ${q.splitNeeded}。`;
                 document.getElementById('hint-content').innerHTML = `
                     <div class="text-center space-y-2">
-                        <p class="text-sm">大數 ${q.num1} 同幾多湊成 10？</p>
+                        <p class="text-sm">大數 ${q.num1} 同幾多合成 10？</p>
                         <div class="flex justify-center items-center gap-3 text-lg font-black">
                             <span class="text-sky-600">${q.num1}</span>
                             <span>+</span>
@@ -1177,7 +1194,7 @@
                     </div>
                 `;
 
-                prompt = `我哋用湊十法。先睇大數 ${q.num1}。${q.num1} 同幾多湊成 10 呀？揀返個數字。`;
+                prompt = `我哋用合十法。先睇大數 ${q.num1}。${q.num1} 同幾多合成 10 呀？揀返個數字。`;
                 renderMultipleChoiceOptions(q.splitNeeded, 1, 9, optionsBox);
             } else if (step === 2) {
                 q.ans = q.remain;
@@ -1196,7 +1213,7 @@
                     </div>
                 `;
 
-                prompt = `好叻！而家睇細數 ${q.num2}。${q.num2} 可以分成 ${q.splitNeeded} 同幾多呀？`;
+                prompt = `好叻！而家睇細數 ${q.num2}。${q.num2} 可以分成 ${q.splitNeeded} 同幾多啊？`;
                 renderMultipleChoiceOptions(q.remain, 1, q.num2 - 1, optionsBox);
             } else {
                 q.ans = q.total;
@@ -1212,7 +1229,8 @@
                     </div>
                 `;
 
-                prompt = `最後一步。${q.num1} 加 ${q.splitNeeded} 等於 10，10 再加 ${q.remain}。咁 ${q.num1} 加 ${q.num2} 等於幾多呀？`;
+                // prompt = `最後一步。${q.num1} 加 ${q.splitNeeded} 等於 10，10 再加 ${q.remain}。咁 ${q.num1} 加 ${q.num2} 等於幾多呀？`;
+                prompt = `最後一步。${q.num1} 加 ${q.splitNeeded} 等於 10，10 再加 ${q.remain} 等於幾多呀？`;
                 renderMultipleChoiceOptions(q.total, 10, 20, optionsBox);
             }
 
@@ -1953,7 +1971,7 @@
             const isFinalStep = !isMultiStep || step >= prepSteps;
 
             if (selected === question.ans) {
-                playSound('correct');
+                const correctSound = playSound('correct');
 
                 // The preparation levels have several picks. Earlier picks only
                 // move to the next step; the point is decided by the final
@@ -1961,7 +1979,12 @@
                 if (isMultiStep && !isFinalStep) {
                     setAnswerButtonTone(btnEl, 'emerald');
 
-                    setTimeout(() => {
+                    // Do not move on until the chime has finished. On Safari
+                    // the effect can start late, and switching immediately
+                    // would show the next step while the sound is still
+                    // playing.
+                    const minimumDelay = new Promise((resolve) => setTimeout(resolve, 650));
+                    Promise.all([correctSound, minimumDelay]).then(() => {
                         const game = document.getElementById('game-screen');
                         if (currentQuestion !== question || question.step !== step) return;
                         if (game && game.classList.contains('hidden')) return;
@@ -1972,7 +1995,7 @@
                         } else {
                             renderPingTenPrepStep(step + 1);
                         }
-                    }, 650);
+                    });
                     return;
                 }
 
@@ -2007,10 +2030,16 @@
 
                 setAnswerButtonTone(btnEl, 'emerald');
 
-                // Auto next question after short delay
-                setTimeout(() => {
+                // Wait for both the short celebration pause and the chime to
+                // finish. This keeps the next question from appearing while
+                // Safari is still playing the correct-answer sound.
+                const minimumDelay = new Promise((resolve) => setTimeout(resolve, isMultiStep ? 1600 : 1200));
+                Promise.all([correctSound, minimumDelay]).then(() => {
+                    const game = document.getElementById('game-screen');
+                    if (currentQuestion !== question) return;
+                    if (game && game.classList.contains('hidden')) return;
                     loadQuestion();
-                }, isMultiStep ? 1600 : 1200);
+                });
 
             } else {
                 playSound('wrong');

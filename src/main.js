@@ -25,7 +25,8 @@ import {
 } from './lib/puterSync.js'
 
 const AUTO_SYNC_DELAY_MS = 2500
-const AUTO_SYNC_DAY_KEY = 'primary-math-auto-sync-day'
+const AUTO_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000
+const LAST_SYNC_KEY = 'primary-math-last-sync-at'
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const $ = (id) => document.getElementById(id)
 
@@ -41,7 +42,6 @@ let cloud = null
 let cloudLoading = false
 let syncing = false
 let autoSyncing = false
-let autoSyncDayCache = null
 let note = null
 let lastSync = null
 let auth = isPuterAvailable() ? 'checking' : 'unavailable'
@@ -72,31 +72,29 @@ function formatTime(ts) {
   })
 }
 
-// Automatic syncing is limited to one successful run per calendar day.
-// Manual sync buttons bypass this entirely.
-function todayKey(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function autoSyncedToday() {
-  if (autoSyncDayCache === todayKey()) return true
+// A successful sync is stored with a timestamp so the daily auto-sync works
+// across reloads and devices. Automatic syncing runs at most once every 24h;
+// manual sync buttons bypass the interval entirely.
+function getLastSyncAt() {
   try {
-    return localStorage.getItem(AUTO_SYNC_DAY_KEY) === todayKey()
+    return Number(localStorage.getItem(LAST_SYNC_KEY)) || 0
   } catch {
-    return false
+    return 0
   }
 }
 
-function markAutoSyncedToday() {
-  autoSyncDayCache = todayKey()
+function markSynced() {
+  lastSync = Date.now()
   try {
-    localStorage.setItem(AUTO_SYNC_DAY_KEY, autoSyncDayCache)
+    localStorage.setItem(LAST_SYNC_KEY, String(lastSync))
   } catch {
     // ignore
   }
+}
+
+function autoSyncDue(now = Date.now()) {
+  const last = getLastSyncAt()
+  return !last || now - last >= AUTO_SYNC_INTERVAL_MS
 }
 
 function applyGameProgress() {
@@ -455,7 +453,7 @@ function renderCloudPanel(panel) {
     </div>
 
     ${lastSync ? `<p class="text-[11px] text-slate-500 mt-2">上次同步 ${formatTime(lastSync)}</p>` : ''}
-    ${autoSyncedToday() ? '<p class="text-[11px] text-emerald-600 mt-1">今日已自動同步 Auto-synced today</p>' : ''}
+    ${!autoSyncDue() ? '<p class="text-[11px] text-emerald-600 mt-1">24 小時內已同步 Synced within 24h</p>' : ''}
     ${note ? `<p class="text-[11px] mt-1 ${note === '已是最新狀態 Up to date' ? 'text-emerald-600' : 'text-rose-600'}">${escapeHtml(note)}</p>` : ''}
 
     <button type="button" data-cloud-action="upload" ${syncing ? 'disabled' : ''}
@@ -487,6 +485,8 @@ async function handleCloudPanelClick(event) {
   else if (action === 'download') await runSync({ push: false, silent: false, force: true })
   else if (action === 'refresh') await refreshCloudSummary()
 }
+
+// ------------------------------------------------------------------- auth/sync
 
 async function checkAuth({ retries = 4 } = {}) {
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -563,7 +563,7 @@ async function runSync({ push = true, silent = false, force = true, applyChanges
 
   try {
     const result = await smartSync({ push, force })
-    lastSync = Date.now()
+    markSynced()
 
     if (result.changed) {
       state = initProfiles()
@@ -591,17 +591,15 @@ async function runSync({ push = true, silent = false, force = true, applyChanges
   }
 }
 
-// Automatic sync runs at most once per calendar day. Successful manual syncs
-// do not consume the daily slot, so progress can still be uploaded later.
+// Automatic cloud sync runs at most once every 24 hours. Manual syncs do not
+// get blocked by this guard.
 async function runAutoSync({ applyChanges = false } = {}) {
   if (!isPuterAvailable() || auth !== 'signedIn') return null
-  if (autoSyncing || autoSyncedToday()) return null
+  if (autoSyncing || !autoSyncDue()) return null
 
   autoSyncing = true
   try {
-    const result = await runSync({ push: true, silent: true, force: false, applyChanges })
-    if (result) markAutoSyncedToday()
-    return result
+    return await runSync({ push: true, silent: true, force: false, applyChanges })
   } finally {
     autoSyncing = false
   }
@@ -609,7 +607,7 @@ async function runAutoSync({ applyChanges = false } = {}) {
 
 function scheduleAutoSync() {
   if (!isPuterAvailable() || auth !== 'signedIn') return
-  if (autoSyncedToday()) return
+  if (!autoSyncDue()) return
 
   clearTimeout(syncTimer)
   syncTimer = setTimeout(() => {
@@ -621,6 +619,7 @@ function scheduleAutoSync() {
 
 async function boot() {
   state = initProfiles()
+  lastSync = getLastSyncAt() || null
   renderProfileUI()
   renderCloudUI()
   applyGameProgress()
@@ -629,6 +628,8 @@ async function boot() {
   const signed = await checkAuth()
   renderCloudUI()
   if (signed) {
+    // If the last successful sync is more than 24 hours old, back up to the
+    // cloud now. Otherwise this is a no-op.
     await runAutoSync({ applyChanges: true })
   }
 }
