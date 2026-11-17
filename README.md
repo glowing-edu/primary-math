@@ -6,7 +6,7 @@ Built as a static site with Vite and deployed to GitHub Pages.
 
 ## Features
 
-- 🎮 **15 stages** — from counting 1-5 through 湊十法、破十法、平十法、借十法
+- 🎮 **16 stages** — from counting 1-5 through 湊十法、破十法、平十法、借十法
 - 🗣️ **Cantonese speech** — hints and explanations via the browser Web Speech API
 - 👧🧒 **Multi-profile** — one profile per child, each with their own stars,
   stage progress and answer history

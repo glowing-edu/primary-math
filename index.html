@@ -266,7 +266,7 @@
         // --- STAGE DEFINITIONS ---
         // Display order follows this array; `id` stays stable so saved progress
         // from earlier versions keeps pointing at the same skill.
-        // New levels use ids 6-13 so old progress (ids 1-5) is untouched.
+        // New levels use ids 6-16 so old progress (ids 1-5) is untouched.
         const STAGES = [
             { id: 6, name: "數一數 1-5", desc: "實物點數與數量對應", group: "basics" },
             { id: 7, name: "5以內分與合", desc: "數的分解與組成", group: "basics" },
@@ -275,6 +275,7 @@
             { id: 10, name: "10以內分與合", desc: "10以內的分解與組成", group: "basics" },
             { id: 11, name: "10以內加法", desc: "10以內的加法概念", group: "basics" },
             { id: 12, name: "10以內減法", desc: "10以內的減法概念", group: "basics" },
+            { id: 16, name: "10以內減法心算", desc: "不用圖案，直接心算", group: "basics" },
             { id: 1, name: "10的組成與分解", desc: "湊十好朋友", group: "advanced" },
             { id: 13, name: "湊十法準備", desc: "三步拆數湊十（預備）", group: "advanced" },
             { id: 2, name: "合十法（湊十法）", desc: "加法進位心算", group: "advanced" },
@@ -284,6 +285,10 @@
             { id: 4, name: "平十法", desc: "減法連續減到10", group: "advanced" },
             { id: 5, name: "借十法", desc: "直式退位減法筆算", group: "advanced" }
         ];
+
+        // Stage ids are not contiguous (new levels keep old ids stable), so
+        // clamp against the largest id rather than the array length.
+        const MAX_STAGE_ID = Math.max(...STAGES.map((s) => s.id));
 
         let currentStage = 1;
         let currentQuestion = null;
@@ -305,7 +310,7 @@
             const p = saved || {};
             savedProgress = p;
             score = Math.max(0, Number(p.score) || 0);
-            currentStage = Math.min(STAGES.length, Math.max(1, Number(p.lastStage) || 1));
+            currentStage = Math.min(MAX_STAGE_ID, Math.max(1, Number(p.lastStage) || 1));
             answerLocked = false;
             const scoreEl = document.getElementById('score-count');
             if (scoreEl) scoreEl.innerText = score;
@@ -483,7 +488,7 @@
         }
 
         function startStage(stageId) {
-            const id = Math.min(STAGES.length, Math.max(1, Number(stageId) || 1));
+            const id = Math.min(MAX_STAGE_ID, Math.max(1, Number(stageId) || 1));
             playSound('click');
             currentStage = id;
             hideHint();
@@ -554,6 +559,9 @@
                     break;
                 case 15:
                     generateStage15(formulaBox, visualArea, optionsBox);
+                    break;
+                case 16:
+                    generateStage16(formulaBox, visualArea, optionsBox);
                     break;
             }
         }
@@ -1118,9 +1126,66 @@
             buildCountingQuestion(randomInt(6, 10), 6, 10, formulaBox, visualArea, optionsBox);
         }
 
+        // Stage 10: number bonds within 10, drawn as a split diagram:
+        //        9
+        //       / \
+        //      8   ?
+        // The missing part is randomly placed on the left or the right so the
+        // child has to read the bond instead of always subtracting the same way.
+        function buildSplitBondQuestion(total, maxTotal, formulaBox, visualArea, optionsBox) {
+            const part = randomInt(1, total - 1);
+            const other = total - part;
+            const unknownRight = Math.random() < 0.5;
+            const unknownSide = unknownRight ? 'right' : 'left';
+            currentQuestion = { ans: other, kind: 'bond', total, part, unknownSide };
+
+            const totalBox = 'w-16 h-12 rounded-2xl bg-amber-100 text-amber-700 border-2 border-amber-200 shadow-sm flex items-center justify-center text-2xl font-black';
+            const knownBox = 'w-14 h-12 rounded-2xl bg-sky-100 text-sky-700 border-2 border-sky-200 shadow-sm flex items-center justify-center text-2xl font-black';
+            const unknownBox = 'w-14 h-12 rounded-2xl bg-amber-50 text-amber-500 border-2 border-dashed border-amber-400 flex items-center justify-center text-2xl font-black';
+            const knownHtml = `<div class="${knownBox}">${part}</div>`;
+            const unknownHtml = `<div class="${unknownBox}" data-bond-answer="box">?</div>`;
+
+            const formulaSlot = '<span class="inline-block border-b-4 border-dashed border-amber-400 w-14 text-center text-amber-500" data-bond-answer="formula">?</span>';
+            formulaBox.innerHTML = `
+                <span class="text-amber-500 font-extrabold">${total}</span>
+                <span class="text-slate-400">=</span>
+                ${unknownRight ? `<span class="text-sky-600">${part}</span><span class="text-sky-500">+</span>${formulaSlot}`
+                               : `${formulaSlot}<span class="text-sky-500">+</span><span class="text-sky-600">${part}</span>`}
+            `;
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <div class="${totalBox}">${total}</div>
+                    <svg class="w-52 h-12 -my-2" viewBox="0 0 208 48" aria-hidden="true">
+                        <line x1="104" y1="3" x2="28" y2="44" stroke="#94a3b8" stroke-width="4" stroke-linecap="round" />
+                        <line x1="104" y1="3" x2="180" y2="44" stroke="#94a3b8" stroke-width="4" stroke-linecap="round" />
+                    </svg>
+                    <div class="w-52 flex items-center justify-between">
+                        ${unknownRight ? knownHtml : unknownHtml}
+                        ${unknownRight ? unknownHtml : knownHtml}
+                    </div>
+                </div>
+            `;
+
+            currentHintSpeechText = `${total} 可以分成 ${part} 同 ${other}。我哋試下：${part} 加 ${other}，合起來就係 ${total}。`;
+            document.getElementById('hint-content').innerHTML = `
+                <div class="text-center space-y-2">
+                    <p class="text-sm">${total} 可以分成：</p>
+                    <div class="flex justify-center items-center gap-3 text-lg font-black">
+                        <span class="bg-sky-100 text-sky-700 px-3 py-1 rounded-xl">${part}</span>
+                        <span>同</span>
+                        <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-xl animate-pulse">${other}</span>
+                    </div>
+                    <p class="text-xs text-slate-600">合起來：${part} + ${other} = <strong>${total}</strong></p>
+                </div>
+            `;
+
+            renderMultipleChoiceOptions(other, 1, maxTotal, optionsBox);
+        }
+
         // Stage 10: number bonds within 10 (includes the key bond of 10).
         function generateStage10(formulaBox, visualArea, optionsBox) {
-            buildBondQuestion(randomInt(6, 10), 10, formulaBox, visualArea, optionsBox);
+            buildSplitBondQuestion(randomInt(6, 10), 10, formulaBox, visualArea, optionsBox);
         }
 
         // Stage 11: addition with sums from 6 to 10.
@@ -1136,6 +1201,47 @@
             const total = randomInt(6, 10);
             const removed = randomInt(1, total - 1);
             buildSubtractionQuestion(total, removed, 10, formulaBox, visualArea, optionsBox);
+        }
+
+        // Stage 16: subtraction within 10 with no pictures. Without emoji or a
+        // ten-frame there is nothing left to count, so the answer has to be
+        // worked out mentally.
+        function generateStage16(formulaBox, visualArea, optionsBox) {
+            const total = randomInt(6, 10);
+            const removed = randomInt(1, total - 1);
+            const ans = total - removed;
+            currentQuestion = { ans, kind: 'sub', total, removed };
+
+            formulaBox.innerHTML = `
+                <span>${total}</span>
+                <span class="text-rose-500">-</span>
+                <span>${removed}</span>
+                <span class="text-slate-400">=</span>
+                <span class="inline-block border-b-4 border-dashed border-rose-400 w-14 text-center text-rose-600">?</span>
+            `;
+
+            visualArea.innerHTML = `
+                <div class="flex flex-col items-center gap-2">
+                    <p class="text-base md:text-lg font-black text-slate-600">用心算，唔使數圖案</p>
+                    <p class="text-xs font-bold text-slate-400">由 ${total} 開始，倒數 ${removed} 個</p>
+                </div>
+            `;
+
+            currentHintSpeechText = `由 ${total} 開始，倒數 ${removed} 個。${total} 減 ${removed}，等於 ${ans}。`;
+            document.getElementById('hint-content').innerHTML = `
+                <div class="text-center space-y-2">
+                    <p class="text-sm">由 ${total} 開始，倒數 ${removed} 個：</p>
+                    <div class="flex justify-center items-center gap-3 text-lg font-black">
+                        <span class="bg-rose-100 text-rose-700 px-3 py-1 rounded-xl">${total}</span>
+                        <span>-</span>
+                        <span class="bg-rose-100 text-rose-700 px-3 py-1 rounded-xl">${removed}</span>
+                        <span>=</span>
+                        <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-xl animate-pulse">${ans}</span>
+                    </div>
+                </div>
+            `;
+
+            renderMultipleChoiceOptions(ans, 0, 10, optionsBox);
         }
 
         // Stage 13: guided make-ten preparation.
@@ -2006,6 +2112,16 @@
                         totalLeaf.textContent = String(question.ans);
                         totalLeaf.className = 'absolute z-10 bg-emerald-200 text-emerald-900 ring-2 ring-emerald-300 font-black text-xl px-4 py-1.5 rounded-xl shadow';
                     }
+                }
+
+                // The number bond fills its missing part with the chosen answer.
+                if (question.kind === 'bond' && question.unknownSide) {
+                    document.querySelectorAll('[data-bond-answer]').forEach((el) => {
+                        el.textContent = String(question.ans);
+                        el.className = el.dataset.bondAnswer === 'formula'
+                            ? 'inline-block border-b-4 border-emerald-400 w-14 text-center text-emerald-600'
+                            : 'w-14 h-12 rounded-2xl bg-emerald-100 text-emerald-700 border-2 border-emerald-300 shadow-sm flex items-center justify-center text-2xl font-black';
+                    });
                 }
 
                 // A question only earns a point if the child got it right on the
