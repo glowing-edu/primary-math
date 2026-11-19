@@ -110,10 +110,6 @@
             <div class="text-center mb-5">
                 <h2 class="text-2xl md:text-3xl font-black text-sky-600">揀一個關卡</h2>
                 <p class="text-sm text-slate-500 font-bold mt-1">Choose a level</p>
-                <div class="inline-flex items-center gap-2 bg-amber-50 px-4 py-1.5 rounded-full border border-amber-200 mt-3">
-                    <i class="fa-solid fa-star text-amber-400"></i>
-                    <span id="level-score-count" class="font-black text-amber-600">0</span>
-                </div>
             </div>
             <div id="level-grid" class="flex flex-col gap-5">
                 <!-- Level cards injected by the game engine -->
@@ -133,11 +129,11 @@
                 <span id="stage-number-badge" class="bg-sky-500 text-white font-black px-3 py-1 rounded-full text-sm shrink-0">階段 1</span>
                 <h2 id="stage-title" class="text-lg md:text-xl font-bold text-slate-700 truncate">10的組成與分解</h2>
             </div>
-            <!-- Stars score display -->
+            <!-- This stage's question stats -->
             <div class="flex flex-col items-end gap-1">
-                <div class="flex items-center gap-2 bg-amber-50 px-4 py-1.5 rounded-full border border-amber-200">
-                    <i class="fa-solid fa-star text-amber-400 text-lg"></i>
-                    <span id="score-count" class="font-black text-amber-600 text-lg">0</span>
+                <div class="text-right leading-tight">
+                    <p class="text-[10px] font-bold text-slate-400">做咗 <span id="stage-done-count" class="font-black text-slate-700 text-xs">0</span> 題</p>
+                    <p id="stage-correct-line" class="text-[10px] font-bold text-slate-400">答對 <span id="stage-correct-count" class="font-black text-xs">0</span> 題</p>
                 </div>
                 <span id="point-note" class="hidden text-[10px] font-black text-rose-500">此題不計分</span>
             </div>
@@ -312,8 +308,6 @@
             score = Math.max(0, Number(p.score) || 0);
             currentStage = Math.min(MAX_STAGE_ID, Math.max(1, Number(p.lastStage) || 1));
             answerLocked = false;
-            const scoreEl = document.getElementById('score-count');
-            if (scoreEl) scoreEl.innerText = score;
             updateStageHeader();
             showLevelSelect();
         }
@@ -414,9 +408,6 @@
             const grid = document.getElementById('level-grid');
             if (!grid) return;
 
-            const levelScore = document.getElementById('level-score-count');
-            if (levelScore) levelScore.innerText = score;
-
             const hasPlayed = Boolean(savedProgress && (Number(savedProgress.attempts) > 0 || Number(savedProgress.updatedAt) > 0));
 
             grid.innerHTML = LEVEL_GROUPS.map((group) => {
@@ -425,12 +416,7 @@
                     .filter(({ s }) => s.group === group.key)
                     .map(({ s, i }) => {
                         const style = LEVEL_STYLES[i % LEVEL_STYLES.length];
-                        const stat = savedProgress && savedProgress.stages ? savedProgress.stages[String(s.id)] : null;
-                        const correct = Math.max(0, Number(stat && stat.correct) || 0);
-                        const attempts = Math.max(0, Number(stat && stat.attempts) || 0);
-                        const progressText = attempts > 0
-                            ? `答對 ${correct} / ${attempts} 題`
-                            : '未開始 Not started';
+                        const { correct, attempts } = stageStat(s.id);
                         const isCurrent = hasPlayed && s.id === currentStage;
 
                         return `
@@ -446,9 +432,12 @@
                                     </span>
                                     <span class="block font-black text-slate-700 mt-0.5">${s.name}</span>
                                     <span class="block text-xs text-slate-500 font-bold">${s.desc}</span>
-                                    <span class="block text-[11px] font-bold mt-1.5 ${attempts > 0 ? 'text-emerald-600' : 'text-slate-400'}">${progressText}</span>
                                 </span>
-                                <span class="self-center text-slate-300 text-lg" aria-hidden="true">▶</span>
+                                <span class="ml-auto shrink-0 flex flex-col items-end gap-1 text-right">
+                                    <span class="text-[10px] font-bold text-slate-400">做咗 <span class="font-black text-slate-700">${attempts}</span> 題</span>
+                                    <span class="text-[10px] font-bold ${attempts > 0 ? 'text-emerald-600' : 'text-slate-400'}">答對 <span class="font-black">${correct}</span> 題</span>
+                                    <span class="text-slate-300 text-sm mt-0.5" aria-hidden="true">▶</span>
+                                </span>
                             </button>
                         `;
                     })
@@ -467,12 +456,37 @@
             }).join('');
         }
 
+        // Questions done and correct for one stage.
+        function stageStat(stageId) {
+            const stat = savedProgress && savedProgress.stages ? savedProgress.stages[String(stageId)] : null;
+            return {
+                attempts: Math.max(0, Number(stat && stat.attempts) || 0),
+                correct: Math.max(0, Number(stat && stat.correct) || 0),
+            };
+        }
+
+        // Keep the current stage's counters in the game header in sync.
+        function updateStageStats() {
+            const { attempts, correct } = stageStat(currentStage);
+            const done = document.getElementById('stage-done-count');
+            const correctEl = document.getElementById('stage-correct-count');
+            const correctLine = document.getElementById('stage-correct-line');
+            if (done) done.innerText = attempts;
+            if (correctEl) correctEl.innerText = correct;
+            if (correctLine) {
+                correctLine.className = attempts > 0
+                    ? 'text-[10px] font-bold text-emerald-600'
+                    : 'text-[10px] font-bold text-slate-400';
+            }
+        }
+
         function updateStageHeader() {
             const badge = document.getElementById('stage-number-badge');
             const title = document.getElementById('stage-title');
             const stage = STAGES.find((s) => s.id === currentStage) || STAGES[0];
             if (badge) badge.innerText = `階段 ${stageOrder(stage.id)}`;
             if (title) title.innerText = stage.name;
+            updateStageStats();
         }
 
         function showLevelSelect() {
@@ -2128,7 +2142,6 @@
                 // first try without opening the hint.
                 if (!questionMissed && !questionHintUsed) {
                     score += 1;
-                    document.getElementById('score-count').innerText = score;
                     setPointNote(false);
                 }
 
@@ -2136,6 +2149,7 @@
                     window.GameProgress.record(currentStage, true);
                 }
                 updateLocalProgress(true);
+                updateStageStats();
 
                 // Confetti animation
                 confetti({
@@ -2169,6 +2183,7 @@
                         window.GameProgress.record(currentStage, false);
                     }
                     updateLocalProgress(false);
+                    updateStageStats();
                 }
 
                 btnEl.classList.add('animate-shake');
